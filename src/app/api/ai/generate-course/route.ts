@@ -52,7 +52,7 @@ ${rawText.slice(0, 4000)}`
       return NextResponse.json({ error: "AI 未能识别出课程结构，请调整大纲格式后重试" }, { status: 500 })
     }
 
-    // Batch create course + modules + knowledge points
+    // Batch create course + modules + knowledge points (use raw FK to avoid transaction issues with Neon HTTP adapter)
     const course = await prisma.course.create({
       data: {
         userId: session.user.id,
@@ -66,7 +66,7 @@ ${rawText.slice(0, 4000)}`
     for (const mod of modules) {
       const parentMod = await prisma.module.create({
         data: {
-          course: { connect: { id: course.id } },
+          courseId: course.id,
           title: mod.title,
           description: mod.description || null,
           sortOrder: sortOrder++,
@@ -79,10 +79,10 @@ ${rawText.slice(0, 4000)}`
         for (const child of children) {
           const childMod = await prisma.module.create({
             data: {
-              course: { connect: { id: course.id } },
+              courseId: course.id,
+              parentModuleId: parentMod.id,
               title: child.title,
               description: child.description || null,
-              parentModule: { connect: { id: parentMod.id } },
               sortOrder: childOrder++,
             },
           })
@@ -93,7 +93,7 @@ ${rawText.slice(0, 4000)}`
             if (kp.title) {
               await prisma.knowledgePoint.create({
                 data: {
-                  module: { connect: { id: childMod.id } },
+                  moduleId: childMod.id,
                   title: kp.title,
                   content: kp.content || "",
                   sortOrder: kpOrder++,
@@ -109,7 +109,7 @@ ${rawText.slice(0, 4000)}`
           if (kp.title) {
             await prisma.knowledgePoint.create({
               data: {
-                module: { connect: { id: parentMod.id } },
+                moduleId: parentMod.id,
                 title: kp.title,
                 content: kp.content || "",
                 sortOrder: kpOrder++,
