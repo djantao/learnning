@@ -137,8 +137,9 @@ ${rawText.slice(0, 4000)}`
     })
 
     return NextResponse.json({ course: fullCourse, message: "课程已生成" }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error("generate-course error:", error)
-    return NextResponse.json({ error: "课程生成失败，请稍后重试" }, { status: 500 })
+    const detail = error?.message || error?.status || String(error)
+    return NextResponse.json({ error: "课程生成失败", detail }, { status: 500 })
   }
 }
