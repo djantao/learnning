@@ -1,0 +1,492 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// AUTH & USER
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  learningProfile    LearningProfile?
+  instructionAnchors InstructionAnchor[]
+  notebooks          Notebook[]
+  pages              Page[]
+  conversations      Conversation[]
+  flashcards         Flashcard[]
+  reviewSessions     ReviewSession[]
+  reminders          Reminder[]
+  practiceRecords    PracticeRecord[]
+  tags               Tag[]
+  learningGoals      LearningGoal[]
+  blindSpots         BlindSpot[]
+  dailyActivities    DailyActivity[]
+  courses            Course[]
+
+  // Auth.js fields
+  accounts   Account[]
+  sessions   Session[]
+  // VerificationToken for next-auth (handled separately)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================
+// AI PERSISTENT MEMORY SYSTEM
+// ============================================================
+
+model LearningProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  learningGoals  String   // "I want to learn Rust systems programming"
+  knowledgeLevel String   // "Beginner in Rust, expert in TypeScript"
+  preferredStyle String   // "Explain with analogies, use code examples"
+  preferences    String   @default("{}") // JSON: { "language": "zh-CN", "detailLevel": "deep" }
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InstructionAnchor {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String   // "Use Chinese for explanations"
+  instruction String   // "Always respond in Chinese unless I ask otherwise"
+  category    String   @default("general") // 'language', 'format', 'depth', 'custom'
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id               String    @id @default(cuid())
+  userId           String
+  title            String?   // Auto-generated from first message
+  topicTags        String    @default("[]") // JSON array
+  relatedNoteIds   String    @default("[]") // JSON array of note IDs
+  courseId         String?
+  knowledgePointId String?
+  messageCount     Int       @default(0)
+  totalTokens      Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  conversationId  String
+  role            String   // 'user', 'assistant', 'system', 'context'
+  content         String
+  tokenCount      Int?
+  contextSnapshot String?  // JSON: what profile/anchors/notes were injected
+  createdAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+// ============================================================
+// KNOWLEDGE BASE
+// ============================================================
+
+model Notebook {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  icon        String   @default("📓")
+  sortOrder   Int      @default(0)
+  color       String   @default("#3B82F6")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sections Section[]
+}
+
+model Section {
+  id              String   @id @default(cuid())
+  notebookId      String
+  parentSectionId String?
+  name            String
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  notebook      Notebook   @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  parentSection Section?   @relation("SectionTree", fields: [parentSectionId], references: [id], onDelete: SetNull)
+  childSections Section[]  @relation("SectionTree")
+  pages         Page[]
+}
+
+model Page {
+  id           String   @id @default(cuid())
+  sectionId    String?
+  userId       String
+  title        String
+  slug         String   // URL-friendly unique per user
+  content      String   @default("") // Markdown content
+  contentPlain String   @default("") // Plain text for FTS
+  excerpt      String?  // First 200 chars
+  isPinned     Boolean  @default(false)
+  isArchived   Boolean  @default(false)
+  viewCount    Int      @default(0)
+  wordCount    Int      @default(0)
+  aiSummary        String?  // AI-generated summary
+  aiKeywords       String   @default("[]") // JSON array of keywords
+  knowledgePointId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  section        Section?        @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  knowledgePoint KnowledgePoint? @relation(fields: [knowledgePointId], references: [id], onDelete: SetNull)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linksFrom   NoteLink[]  @relation("SourcePage")
+  linksTo     NoteLink[]  @relation("TargetPage")
+  flashcards  Flashcard[]
+  attachments Attachment[]
+  tags        PageTag[]
+  goalMaterials GoalMaterial[]
+
+  @@unique([userId, slug])
+}
+
+// Bidirectional wiki-style links
+model NoteLink {
+  id           String   @id @default(cuid())
+  sourcePageId String
+  targetPageId String
+  linkText     String?  // Display text in [[link]]
+  context      String?  // Surrounding paragraph
+  createdAt    DateTime @default(now())
+
+  sourcePage Page @relation("SourcePage", fields: [sourcePageId], references: [id], onDelete: Cascade)
+  targetPage Page @relation("TargetPage", fields: [targetPageId], references: [id], onDelete: Cascade)
+
+  @@unique([sourcePageId, targetPageId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String   @default("#6B7280")
+  createdAt DateTime @default(now())
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pages PageTag[]
+
+  @@unique([userId, name])
+}
+
+model PageTag {
+  pageId String
+  tagId  String
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([pageId, tagId])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  pageId       String
+  filename     String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String
+  createdAt    DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// SPACED REPETITION (SM-2)
+// ============================================================
+
+model Flashcard {
+  id                    String   @id @default(cuid())
+  pageId                String?
+  knowledgePointId      String?
+  userId                String
+  front                 String   // Question (Markdown)
+  back                  String   // Answer (Markdown)
+  sourceType            String   @default("manual") // 'manual', 'ai_generated', 'imported'
+  aiDeepQuestionPrompt  String?  // AI follow-up prompt template
+  difficulty            Float?   // User-assigned or AI-estimated 0.0-1.0
+  tagsJson              String   @default("[]") // JSON array
+  // SM-2 state
+  sm2Interval           Float    @default(0)     // Days until next review
+  sm2Repetitions        Int      @default(0)     // Number of successful reviews
+  sm2Efactor            Float    @default(2.5)   // Easiness factor (min 1.3)
+  sm2NextReview         DateTime @default(now()) // When to show next
+  isSuspended           Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  page            Page?           @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  knowledgePoint  KnowledgePoint? @relation(fields: [knowledgePointId], references: [id], onDelete: SetNull)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewLogs      ReviewLog[]
+
+  @@index([userId, sm2NextReview])
+}
+
+model ReviewSession {
+  id                String    @id @default(cuid())
+  userId            String
+  startedAt         DateTime  @default(now())
+  endedAt           DateTime?
+  cardsReviewed     Int       @default(0)
+  gradesDistribution String?  // JSON: { "0": 3, "1": 5, ... }
+  avgGrade          Float?
+  totalTimeSeconds  Int?
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewLogs ReviewLog[]
+}
+
+model ReviewLog {
+  id                String   @id @default(cuid())
+  sessionId         String
+  flashcardId       String
+  grade             Int      // 0-5
+  intervalBefore    Float
+  intervalAfter     Float
+  efactorBefore     Float
+  efactorAfter      Float
+  repetitionsBefore Int
+  responseTimeMs    Int?
+  aiQuestion        String?  // AI deep question
+  aiUserAnswer      String?  // User's answer to AI question
+  aiFeedback        String?  // AI feedback on answer
+  createdAt         DateTime @default(now())
+
+  session   ReviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  flashcard Flashcard     @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// LEARNING PATH TRACKING
+// ============================================================
+
+model LearningGoal {
+  id            String    @id @default(cuid())
+  userId        String
+  parentGoalId  String?
+  title         String
+  description   String?
+  status        String    @default("not_started") // 'not_started', 'in_progress', 'completed', 'paused'
+  progressPct   Float     @default(0.0)
+  sortOrder     Int       @default(0)
+  targetDate    DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentGoal LearningGoal? @relation("GoalTree", fields: [parentGoalId], references: [id], onDelete: SetNull)
+  childGoals LearningGoal[] @relation("GoalTree")
+  materials  GoalMaterial[]
+}
+
+model GoalMaterial {
+  id              String   @id @default(cuid())
+  goalId          String
+  pageId          String?
+  flashcardSetId  String?  // Group of related flashcards
+  resourceUrl     String?
+  resourceTitle   String?
+  isCompleted     Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  goal LearningGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  page Page?        @relation(fields: [pageId], references: [id], onDelete: SetNull)
+}
+
+// Knowledge blind spot tracking
+model BlindSpot {
+  id              String   @id @default(cuid())
+  userId          String
+  topic           String   // "Rust Ownership"
+  description     String   // AI-generated description
+  severity        Float    @default(0.5) // 0.0-1.0
+  detectedFrom    String?  // JSON: source
+  relatedCardIds  String   @default("[]") // JSON array
+  suggestion      String?  // AI-generated study suggestion
+  isResolved      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// DAILY ACTIVITY TRACKING
+// ============================================================
+
+model DailyActivity {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime // Date only
+  cardsReviewed   Int      @default(0)
+  cardsNew        Int      @default(0)
+  cardsMastered   Int      @default(0)
+  notesCreated    Int      @default(0)
+  notesEdited     Int      @default(0)
+  aiConversations Int      @default(0)
+  studyMinutes    Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+// ============================================================
+// REMINDERS & NOTIFICATIONS
+// ============================================================
+
+model Reminder {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "review" | "study" | "achievement" | "system"
+  title     String
+  message   String
+  link      String?  // e.g. "/review/cards"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+}
+
+// ============================================================
+// PRACTICE SYSTEM
+// ============================================================
+
+model PracticeRecord {
+  id               String   @id @default(cuid())
+  userId           String
+  knowledgePointId String
+  questions        String   @default("[]") // JSON array of question strings
+  userAnswers      String   @default("[]") // JSON array of answer strings
+  aiFeedback       String?  // AI overall evaluation
+  aiScore          Int?     // AI suggested mastery 1-5
+  questionResults  String?  @default("[]") // JSON: {isCorrect,correctAnswer,explanation}[]
+  createdAt        DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgePoint KnowledgePoint @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
+  @@index([userId, knowledgePointId, createdAt])
+}
+
+// ============================================================
+// CURRICULUM & AI COACH
+// ============================================================
+
+model Course {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  icon        String   @default("📚")
+  color       String   @default("#8B5CF6")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modules Module[]
+}
+
+model Module {
+  id             String   @id @default(cuid())
+  courseId       String
+  parentModuleId String?
+  title          String
+  description    String?
+  sortOrder      Int      @default(0)
+  status         String   @default("not_started") // not_started | in_progress | completed
+  progressPct    Float    @default(0.0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  course          Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  parentModule    Module?         @relation("ModuleTree", fields: [parentModuleId], references: [id], onDelete: SetNull)
+  childModules    Module[]        @relation("ModuleTree")
+  knowledgePoints KnowledgePoint[]
+}
+
+model KnowledgePoint {
+  id        String   @id @default(cuid())
+  moduleId  String
+  title     String
+  content   String   @default("") // Markdown learning content
+  status    String   @default("not_started") // not_started | in_progress | mastered
+  mastery   Int      @default(0) // 0-5
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  module          Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  flashcards      Flashcard[]
+  practiceRecords PracticeRecord[]
+  pages           Page[]
+}
