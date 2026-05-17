@@ -81,7 +81,7 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
       const res = await fetch("/api/ai/enrich-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ knowledgePointId, title, moduleTitle: moduleTitle || "", courseTitle: courseTitle || "", level: targetLevel }),
+        body: JSON.stringify({ knowledgePointId, title, moduleTitle: moduleTitle || "", courseTitle: courseTitle || "", level: targetLevel, regenerate: true }),
       })
       if (!res.ok) throw new Error("Failed")
       const data = await res.json()

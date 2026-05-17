@@ -25,9 +25,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
   }
 
-  // Return cached content if already has substantial content and not a forced regenerate
-  if (!regenerate && kp.content && kp.content.trim().length >= 100 && kp.content.includes("## ")) {
-    return NextResponse.json({ content: kp.content, cached: true, message: "已加载已有内容" })
+  // Return cached content if already has substantial content, not a forced regenerate,
+  // and the cached content matches the requested difficulty level
+  const contentHasDifficultyTag = kp.content && kp.content.includes(`<!-- difficulty: ${difficulty} -->`)
+  const stripDifficultyTag = (c: string) => c.replace(/\n\n<!-- difficulty: .+ -->$/, "")
+
+  if (!regenerate && kp.content && kp.content.trim().length >= 100 && kp.content.includes("## ") && contentHasDifficultyTag) {
+    return NextResponse.json({ content: stripDifficultyTag(kp.content), cached: true, message: "已加载已有内容" })
   }
 
   const contextInfo = [courseTitle, moduleTitle].filter(Boolean).join(" > ")
@@ -157,10 +161,11 @@ ${levelPrompt}
       return NextResponse.json({ error: "AI 返回内容不足" }, { status: 500 })
     }
 
-    // Save to DB
+    // Save to DB with difficulty tag for cache-aware retrieval
+    const taggedContent = content + `\n\n<!-- difficulty: ${difficulty} -->`
     await prisma.knowledgePoint.update({
       where: { id: knowledgePointId },
-      data: { content },
+      data: { content: taggedContent },
     })
 
     return NextResponse.json({ content, message: "内容已生成" })
