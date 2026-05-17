@@ -482,8 +482,9 @@ model KnowledgePoint {
   status    String   @default("not_started") // not_started | in_progress | mastered
   mastery   Int      @default(0) // 0-5
   sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  firstOpenedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   module          Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   flashcards      Flashcard[]

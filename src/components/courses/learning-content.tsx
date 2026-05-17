@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { renderMarkdown } from "@/lib/markdown"
 import { FileText, PenLine, Loader2, RotateCw, GraduationCap } from "lucide-react"
@@ -39,6 +39,18 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
   const [enriching, setEnriching] = useState(false)
   const [enrichError, setEnrichError] = useState(false)
   const [difficulty, setDifficulty] = useState<Difficulty>("入门")
+  const openedRef = useRef(false)
+
+  // Record first time opening this knowledge point's content
+  useEffect(() => {
+    if (openedRef.current || !initialContent || isThinContent(initialContent)) return
+    openedRef.current = true
+    fetch(`/api/knowledge-points/${knowledgePointId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstOpenedAt: new Date().toISOString() }),
+    }).catch(() => {})
+  }, [knowledgePointId, initialContent])
 
   useEffect(() => {
     if (!isThinContent(initialContent) || enriching || enrichError || !knowledgePointId) return

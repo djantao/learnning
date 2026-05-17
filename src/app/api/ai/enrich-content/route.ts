@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await req.json()
-  const { knowledgePointId, title, moduleTitle, courseTitle, level } = body
+  const { knowledgePointId, title, moduleTitle, courseTitle, level, regenerate } = body
 
   if (!knowledgePointId || !title) {
     return NextResponse.json({ error: "缺少知识点信息" }, { status: 400 })
@@ -23,6 +23,11 @@ export async function POST(req: Request) {
   })
   if (!kp || kp.module.course.userId !== session.user.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+  }
+
+  // Return cached content if already has substantial content and not a forced regenerate
+  if (!regenerate && kp.content && kp.content.trim().length >= 100 && kp.content.includes("## ")) {
+    return NextResponse.json({ content: kp.content, cached: true, message: "已加载已有内容" })
   }
 
   const contextInfo = [courseTitle, moduleTitle].filter(Boolean).join(" > ")
