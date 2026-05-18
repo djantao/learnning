@@ -7,7 +7,7 @@ const client = new OpenAI({
   apiKey: process.env.DOUBAO_API_KEY ?? "placeholder",
 })
 
-const defaultModel = "doubao-1-5-pro-32k-250115"
+const defaultModel = "doubao-seed-2-0-pro-260215"
 
 interface ChatParams {
   messages: { role: "user" | "assistant" | "system"; content: string }[]
