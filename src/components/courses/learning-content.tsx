@@ -18,6 +18,8 @@ interface LearningContentProps {
   courseTitle?: string
   mastery: number
   onMasteryChange: (value: number) => void
+  firstOpenedAt?: string | null
+  completedAt?: string | null
 }
 
 function isThinContent(content: string) {
@@ -27,30 +29,62 @@ function isThinContent(content: string) {
   return false
 }
 
+function formatTime(iso: string | null | undefined) {
+  if (!iso) return null
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: "入门", label: "入门" },
   { value: "进阶", label: "进阶" },
   { value: "高阶", label: "高阶" },
 ]
 
-export function LearningContent({ title, content: initialContent, knowledgePointId, moduleTitle, courseTitle, mastery, onMasteryChange }: LearningContentProps) {
+export function LearningContent({ title, content: initialContent, knowledgePointId, moduleTitle, courseTitle, mastery, onMasteryChange, firstOpenedAt: initialFirstOpenedAt, completedAt: initialCompletedAt }: LearningContentProps) {
   const [tab, setTab] = useState<ActiveTab>("content")
   const [content, setContent] = useState(initialContent)
   const [enriching, setEnriching] = useState(false)
   const [enrichError, setEnrichError] = useState(false)
   const [difficulty, setDifficulty] = useState<Difficulty>("入门")
+  const [firstOpenedAt, setFirstOpenedAt] = useState<string | null>(initialFirstOpenedAt ?? null)
+  const [completedAt, setCompletedAt] = useState<string | null>(initialCompletedAt ?? null)
   const openedRef = useRef(false)
+  const completedRef = useRef(false)
 
   // Record first time opening this knowledge point's content
   useEffect(() => {
     if (openedRef.current || !initialContent || isThinContent(initialContent)) return
     openedRef.current = true
+    const now = new Date().toISOString()
+    setFirstOpenedAt(now)
     fetch(`/api/knowledge-points/${knowledgePointId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ firstOpenedAt: new Date().toISOString() }),
+      body: JSON.stringify({ firstOpenedAt: now }),
     }).catch(() => {})
   }, [knowledgePointId, initialContent])
+
+  // Track completedAt from initial prop and auto-set when mastery reaches threshold
+  useEffect(() => {
+    if (initialCompletedAt && !completedRef.current) {
+      completedRef.current = true
+      setCompletedAt(initialCompletedAt)
+    }
+  }, [initialCompletedAt])
+
+  useEffect(() => {
+    if (completedRef.current || mastery < 4 || !knowledgePointId) return
+    completedRef.current = true
+    const now = new Date().toISOString()
+    setCompletedAt(now)
+    fetch(`/api/knowledge-points/${knowledgePointId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completedAt: now }),
+    }).catch(() => {})
+  }, [mastery, knowledgePointId])
 
   useEffect(() => {
     if (!isThinContent(initialContent) || enriching || enrichError || !knowledgePointId) return
@@ -172,8 +206,12 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-6 py-6">
             <h1 className="text-2xl font-bold mb-2">{title}</h1>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
               <span>学习内容</span><span>·</span><span>AI 生成</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground/70 mb-6">
+              {formatTime(firstOpenedAt) && <span>首次打开：{formatTime(firstOpenedAt)}</span>}
+              {formatTime(completedAt) && <span>完成时间：{formatTime(completedAt)}</span>}
             </div>
             <div className="text-sm leading-relaxed prose prose-slate dark:prose-invert max-w-none">
               {renderMarkdown(content)}

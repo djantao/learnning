@@ -59,6 +59,11 @@ export async function PATCH(
     delete body.firstOpenedAt
   }
 
+  // Only set completedAt once — never overwrite
+  if (body.completedAt && owner.completedAt) {
+    delete body.completedAt
+  }
+
   const kp = await prisma.knowledgePoint.update({ where: { id: kpId }, data: body })
 
   if (body.mastery !== undefined) {

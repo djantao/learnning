@@ -7,26 +7,38 @@ const client = new OpenAI({
   apiKey: process.env.DOUBAO_API_KEY ?? "placeholder",
 })
 
-const defaultModel = "doubao-seed-2-0-pro-260215"
+const defaultModel = "doubao-1-5-pro-32k"
 
 interface ChatParams {
   messages: { role: "user" | "assistant" | "system"; content: string }[]
   model?: string
   maxTokens?: number
   temperature?: number
+  topP?: number
+  stream?: boolean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extra?: Record<string, any>
 }
 
 export async function chatCompletion(params: ChatParams) {
-  const stream = await client.chat.completions.create({
+  const useStream = params.stream ?? true
+  const response = await client.chat.completions.create({
     model: params.model ?? defaultModel,
     messages: params.messages,
-    stream: true,
+    stream: useStream,
     max_tokens: params.maxTokens ?? 4096,
     temperature: params.temperature ?? 0.7,
+    top_p: params.topP,
+    ...(params.extra ?? {}),
   })
 
+  if (!useStream) {
+    const completion = response as OpenAI.Chat.Completions.ChatCompletion
+    return completion
+  }
+
   let fullContent = ""
-  for await (const chunk of stream) {
+  for await (const chunk of response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
     fullContent += chunk.choices?.[0]?.delta?.content ?? ""
   }
 
