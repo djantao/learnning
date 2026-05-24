@@ -44,10 +44,20 @@ export async function DELETE(
   })
   if (!course) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
-  const result = await prisma.module.updateMany({
+  // findMany + 逐个更新（Neon HTTP 不支持 updateMany）
+  const modules = await prisma.module.findMany({
     where: { courseId, scheduledDate: { not: null } },
-    data: { scheduledDate: null },
+    select: { id: true },
   })
 
-  return NextResponse.json({ cleared: result.count })
+  await Promise.all(
+    modules.map((m) =>
+      prisma.module.update({
+        where: { id: m.id },
+        data: { scheduledDate: null },
+      })
+    )
+  )
+
+  return NextResponse.json({ cleared: modules.length })
 }
