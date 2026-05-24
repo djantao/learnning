@@ -170,7 +170,7 @@ export function Timetable() {
                       <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{formatMinutes(dayTotal)}</span>
                     </div>
                     {dayModules.map((m) => (
-                      <Link key={m.id} href={`/courses/${m.course.id}/learn/${m.id}`}>
+                      <Link key={m.id} href={`/courses/${m.course.id}`}>
                         <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${m.status === "completed" ? "opacity-60" : ""}`}>
                           <CardContent className="py-2 px-2.5 space-y-1">
                             <div className="flex items-center gap-1.5">

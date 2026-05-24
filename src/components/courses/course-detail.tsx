@@ -50,6 +50,14 @@ function formatPredicted(daysLeft: number | null, totalKps: number, masteredKps:
   return `${d.getMonth() + 1}月${d.getDate()}日`
 }
 
+function totalModuleMinutes(mod: Module): number {
+  let total = mod.estimatedMinutes ?? 0
+  for (const child of mod.childModules) {
+    total += totalModuleMinutes(child)
+  }
+  return total
+}
+
 export function CourseDetail({ course: initialCourse, stats }: { course: Course; stats?: CourseStats }) {
   const router = useRouter()
   const [course] = useState(initialCourse)
@@ -142,9 +150,13 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
                 )}
                 <CardTitle className="text-sm font-medium truncate">{mod.title}</CardTitle>
                 <Badge variant="outline" className="text-[10px]">{statusLabel(mod.status)}</Badge>
-                {mod.estimatedMinutes != null && (
-                  <span className="text-[10px] text-muted-foreground">~{mod.estimatedMinutes}分钟</span>
-                )}
+                {(() => {
+                  const total = totalModuleMinutes(mod)
+                  if (total > 0) {
+                    return <span className="text-[10px] text-muted-foreground">~{total}分钟</span>
+                  }
+                  return null
+                })()}
                 {mod.progressPct > 0 && (
                   <span className="text-xs text-muted-foreground">{mod.progressPct}%</span>
                 )}
