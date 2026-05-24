@@ -335,10 +335,12 @@ model LearningGoal {
   sortOrder     Int       @default(0)
   targetDate    DateTime?
   completedAt   DateTime?
+  courseId      String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course?       @relation(fields: [courseId], references: [id], onDelete: SetNull)
   parentGoal LearningGoal? @relation("GoalTree", fields: [parentGoalId], references: [id], onDelete: SetNull)
   childGoals LearningGoal[] @relation("GoalTree")
   materials  GoalMaterial[]
@@ -448,12 +450,14 @@ model Course {
   description String?
   icon        String   @default("📚")
   color       String   @default("#8B5CF6")
-  isActive    Boolean  @default(true)
+  isActive          Boolean  @default(true)
+  dailyStudyMinutes Int?     // 用户计划的每日学习时长（分钟）
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   modules Module[]
+  goals   LearningGoal[]
 }
 
 model Module {
@@ -463,15 +467,18 @@ model Module {
   title          String
   description    String?
   sortOrder      Int      @default(0)
-  status         String   @default("not_started") // not_started | in_progress | completed
-  progressPct    Float    @default(0.0)
-  createdAt      DateTime @default(now())
+  status            String   @default("not_started") // not_started | in_progress | completed
+  progressPct       Float    @default(0.0)
+  estimatedMinutes  Int?     // AI 估算的学习时长（分钟）
+  scheduledDate     DateTime? // 排期学习日期
+  createdAt         DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   course          Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
   parentModule    Module?         @relation("ModuleTree", fields: [parentModuleId], references: [id], onDelete: SetNull)
   childModules    Module[]        @relation("ModuleTree")
   knowledgePoints KnowledgePoint[]
+  mindMap         MindMap?
 }
 
 model KnowledgePoint {
@@ -491,4 +498,15 @@ model KnowledgePoint {
   flashcards      Flashcard[]
   practiceRecords PracticeRecord[]
   pages           Page[]
+}
+
+model MindMap {
+  id        String   @id @default(cuid())
+  moduleId  String   @unique
+  data      String   @default("{}")
+  layout    String   @default("vertical")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 }

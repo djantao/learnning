@@ -1,0 +1,32 @@
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/db"
+import { scheduleCourse } from "@/lib/schedule"
+import { NextResponse } from "next/server"
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ courseId: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { courseId } = await params
+  const { dailyStudyMinutes } = await req.json()
+
+  if (!dailyStudyMinutes || dailyStudyMinutes < 10) {
+    return NextResponse.json({ error: "每日学习时长至少10分钟" }, { status: 400 })
+  }
+
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, userId: session.user.id },
+  })
+  if (!course) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+
+  try {
+    const result = await scheduleCourse(courseId, dailyStudyMinutes)
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error("schedule error:", error)
+    return NextResponse.json({ error: "排期失败" }, { status: 500 })
+  }
+}

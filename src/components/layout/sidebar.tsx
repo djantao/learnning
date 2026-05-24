@@ -14,11 +14,13 @@ import {
   Settings,
   GraduationCap,
   Library,
+  CalendarClock,
 } from "lucide-react"
 
 const navItems = [
   { href: "/", label: "仪表盘", icon: LayoutDashboard },
   { href: "/courses", label: "课程", icon: GraduationCap },
+  { href: "/schedule", label: "学习排期", icon: CalendarClock },
   { href: "/notebooks", label: "笔记本", icon: BookOpen },
   { href: "/questions", label: "题库", icon: Library },
   { href: "/review", label: "复习", icon: Brain },
