@@ -23,7 +23,7 @@ export async function POST(
   if (!course) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
   try {
-    const result = await scheduleCourse(courseId, dailyStudyMinutes)
+    const result = await scheduleCourse(session.user.id, courseId, dailyStudyMinutes)
     return NextResponse.json(result)
   } catch (error: any) {
     console.error("schedule error:", error)

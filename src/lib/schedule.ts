@@ -11,6 +11,16 @@ interface ScheduleAssignment {
   scheduledDate: Date
 }
 
+function fmtDate(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d)
+  r.setDate(r.getDate() + n)
+  return r
+}
+
 /** DFS 扁平化模块树，按 sortOrder 排序，仅保留有预估时长的模块 */
 export function flattenModules(modules: {
   id: string
@@ -31,18 +41,28 @@ export function flattenModules(modules: {
   return result
 }
 
-/** 将模块列表按每日学习时长分配到具体日期 */
-export function assignDates(flatModules: FlatModule[], dailyMinutes: number, startDate: Date): ScheduleAssignment[] {
+/**
+ * 分配日期 — 考虑其他课程已占用的日期容量。
+ * existingOccupancy: dateStr → 该日已被其他课程占用的分钟数
+ * dailyMinutes: 用户每日总学习时长上限
+ */
+export function assignDates(
+  flatModules: FlatModule[],
+  dailyMinutes: number,
+  startDate: Date,
+  existingOccupancy: Map<string, number> = new Map()
+): ScheduleAssignment[] {
   const assignments: ScheduleAssignment[] = []
   let currentDate = new Date(startDate)
-  let accumulated = 0
+  let accumulated = existingOccupancy.get(fmtDate(currentDate)) ?? 0
 
   for (const mod of flatModules) {
-    if (accumulated + mod.estimatedMinutes > dailyMinutes && accumulated > 0) {
-      currentDate = new Date(currentDate)
-      currentDate.setDate(currentDate.getDate() + 1)
-      accumulated = 0
+    // 当前日期容量不够 → 往后顺移
+    while (accumulated + mod.estimatedMinutes > dailyMinutes) {
+      currentDate = addDays(currentDate, 1)
+      accumulated = existingOccupancy.get(fmtDate(currentDate)) ?? 0
     }
+
     assignments.push({
       moduleId: mod.id,
       scheduledDate: new Date(currentDate),
@@ -53,15 +73,17 @@ export function assignDates(flatModules: FlatModule[], dailyMinutes: number, sta
   return assignments
 }
 
-/** 完整排期流程：查询模块树 → 分配日期 → 批量更新 DB → 更新 Course.dailyStudyMinutes */
-export async function scheduleCourse(courseId: string, dailyMinutes: number, startDate?: Date) {
+/** 完整排期流程：读取已有排期 → 计算每日余量 → 插入新模块 → 批量更新 */
+export async function scheduleCourse(
+  userId: string,
+  courseId: string,
+  dailyMinutes: number,
+  startDate?: Date
+) {
   const modules = await prisma.module.findMany({
     where: { courseId, parentModuleId: null },
     select: {
-      id: true,
-      title: true,
-      estimatedMinutes: true,
-      sortOrder: true,
+      id: true, title: true, estimatedMinutes: true, sortOrder: true,
       childModules: {
         select: {
           id: true, title: true, estimatedMinutes: true, sortOrder: true,
@@ -79,9 +101,32 @@ export async function scheduleCourse(courseId: string, dailyMinutes: number, sta
     return { scheduled: 0, message: "没有含预估时长的模块，请先估算学习时长" }
   }
 
-  const assignments = assignDates(flat, dailyMinutes, startDate ?? new Date())
+  // 查询该用户其他课程已排期的模块，构建每日占用表
+  const existingScheduled = await prisma.module.findMany({
+    where: {
+      course: { userId },
+      scheduledDate: { not: null },
+      courseId: { not: courseId }, // 排除当前课程（重新排期场景）
+    },
+    select: { estimatedMinutes: true, scheduledDate: true },
+  })
 
-  // 逐个更新（Neon HTTP 不支持 $transaction）
+  const occupancyMap = new Map<string, number>()
+  for (const m of existingScheduled) {
+    if (!m.scheduledDate) continue
+    const key = fmtDate(m.scheduledDate)
+    occupancyMap.set(key, (occupancyMap.get(key) ?? 0) + (m.estimatedMinutes ?? 0))
+  }
+
+  const start = startDate ?? new Date()
+  // 确保 startDate 不会落在已被占满的日期
+  let actualStart = new Date(start)
+  while ((occupancyMap.get(fmtDate(actualStart)) ?? 0) >= dailyMinutes) {
+    actualStart = addDays(actualStart, 1)
+  }
+
+  const assignments = assignDates(flat, dailyMinutes, actualStart, occupancyMap)
+
   await Promise.all(
     assignments.map((a) =>
       prisma.module.update({
