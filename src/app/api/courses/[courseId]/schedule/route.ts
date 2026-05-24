@@ -25,8 +25,8 @@ export async function POST(
   try {
     const result = await scheduleCourse(courseId, dailyStudyMinutes)
     return NextResponse.json(result)
-  } catch (error) {
+  } catch (error: any) {
     console.error("schedule error:", error)
-    return NextResponse.json({ error: "排期失败" }, { status: 500 })
+    return NextResponse.json({ error: "排期失败", detail: error?.message || String(error) }, { status: 500 })
   }
 }

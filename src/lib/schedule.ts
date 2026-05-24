@@ -81,7 +81,8 @@ export async function scheduleCourse(courseId: string, dailyMinutes: number, sta
 
   const assignments = assignDates(flat, dailyMinutes, startDate ?? new Date())
 
-  await prisma.$transaction(
+  // 逐个更新（Neon HTTP 不支持 $transaction）
+  await Promise.all(
     assignments.map((a) =>
       prisma.module.update({
         where: { id: a.moduleId },
