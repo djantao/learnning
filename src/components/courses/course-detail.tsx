@@ -11,7 +11,7 @@ import {
   ChevronRight, ChevronDown, Plus, GraduationCap, Play, Pencil, Loader2, Clock, Target, CalendarClock, ClipboardCheck,
 } from "lucide-react"
 import type { CourseStats } from "@/lib/course-stats"
-import { masteryLabel } from "@/lib/curriculum"
+import { masteryLabel } from "@/lib/mastery"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import Link from "next/link"

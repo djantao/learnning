@@ -86,12 +86,7 @@ export async function recomputeForKnowledgePoint(knowledgePointId: string) {
   }
 }
 
-/** mastery 0-5 → 三档标签 */
-export function masteryLabel(mastery: number): { label: string; color: string } {
-  if (mastery >= 5) return { label: "掌握", color: "green" }
-  if (mastery >= 3) return { label: "熟练", color: "amber" }
-  return { label: "薄弱", color: "red" }
-}
+export { masteryLabel } from "./mastery"
 
 /** 计算模块掌握率 — 递归统计所有 KP 的三档分布 */
 export async function moduleMasteryRate(moduleId: string) {
