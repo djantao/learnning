@@ -10,8 +10,10 @@ export function quizGenPrompt(params: {
   const domainGuard = `【领域铁律】为课程「${courseTitle}」→ 模块「${moduleTitle}」出综合测验。所有题目必须属于「${courseTitle}」领域。`
 
   const kpText = kpContents
-    .map((kp, i) => `知识点${i + 1}：${kp.title}\n内容：${kp.content.slice(0, 500)}`)
+    .map((kp, i) => `知识点${i + 1}（ID: ${kp.id}）：${kp.title}\n内容：${kp.content.slice(0, 500)}`)
     .join("\n\n")
+
+  const kpIdList = kpContents.map((kp) => kp.id).join(", ")
 
   return `${domainGuard}
 
@@ -56,7 +58,8 @@ ${kpText}
   ]
 }
 
-题目总数必须是 ${kpContents.length * 2} 道，每个知识点各 1 道选择 + 1 道简答。`
+题目总数必须是 ${kpContents.length * 2} 道，每个知识点各 1 道选择 + 1 道简答。
+kpId 必须使用以下真实数据库 ID：${kpIdList}。不要编造 kpId。`
 }
 
 export function quizEvalPrompt(params: {
