@@ -30,3 +30,24 @@ export async function POST(
     return NextResponse.json({ error: "排期失败", detail: error?.message || String(error) }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ courseId: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { courseId } = await params
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, userId: session.user.id },
+  })
+  if (!course) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+
+  const result = await prisma.module.updateMany({
+    where: { courseId, scheduledDate: { not: null } },
+    data: { scheduledDate: null },
+  })
+
+  return NextResponse.json({ cleared: result.count })
+}

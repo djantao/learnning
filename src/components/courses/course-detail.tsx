@@ -22,7 +22,7 @@ interface KP {
 interface Module {
   id: string; title: string; description: string | null; status: string
   progressPct: number; sortOrder: number
-  estimatedMinutes: number | null
+  estimatedMinutes: number | null; scheduledDate: string | null
   childModules: Module[]
   knowledgePoints: KP[]
 }
@@ -70,6 +70,22 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [dailyMinutes, setDailyMinutes] = useState("120")
   const [scheduling, setScheduling] = useState(false)
+  const [clearingSchedule, setClearingSchedule] = useState(false)
+
+  async function clearSchedule() {
+    setClearingSchedule(true)
+    try {
+      const res = await fetch(`/api/courses/${course.id}/schedule`, { method: "DELETE" })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(data.cleared > 0 ? `已清除 ${data.cleared} 个模块的排期` : "没有排期需要清除")
+        router.refresh()
+      } else {
+        toast.error(data.error || "清除失败")
+      }
+    } catch { toast.error("清除失败") }
+    setClearingSchedule(false)
+  }
 
   function toggle(id: string) {
     const next = new Set(expanded)
@@ -157,6 +173,9 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
                   }
                   return null
                 })()}
+                {mod.scheduledDate && (
+                  <span className="text-[10px] text-primary/70">{new Date(mod.scheduledDate).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}</span>
+                )}
                 {mod.progressPct > 0 && (
                   <span className="text-xs text-muted-foreground">{mod.progressPct}%</span>
                 )}
@@ -280,11 +299,15 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
               </div>
             </div>
             <Progress value={stats.progressPct} className="h-2 mt-4" />
-            <div className="mt-3 flex justify-center">
+            <div className="mt-3 flex justify-center gap-2">
               <Button variant="outline" size="sm" className="gap-1"
                 onClick={() => setScheduleOpen(true)}>
                 <CalendarClock className="h-3.5 w-3.5" />
                 自动排期
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground"
+                onClick={clearSchedule} disabled={clearingSchedule}>
+                {clearingSchedule ? "清除中..." : "清除排期"}
               </Button>
             </div>
           </CardContent>
