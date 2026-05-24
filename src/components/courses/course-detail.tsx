@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import {
-  ChevronRight, ChevronDown, Plus, GraduationCap, Play, Pencil, Loader2, Clock, Target, CalendarClock,
+  ChevronRight, ChevronDown, Plus, GraduationCap, Play, Pencil, Loader2, Clock, Target, CalendarClock, ClipboardCheck,
 } from "lucide-react"
 import type { CourseStats } from "@/lib/course-stats"
+import { masteryLabel } from "@/lib/curriculum"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -181,6 +182,11 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
                 )}
               </div>
               <div className="flex gap-1 shrink-0 ml-2">
+                <Link href={`/courses/${course.id}/quiz/${mod.id}`}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="模块测验">
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
                 <Button variant="ghost" size="icon" className="h-7 w-7"
                   onClick={() => { setAddingKP(mod.id); setKpName("") }}>
                   <Plus className="h-3.5 w-3.5" />
@@ -223,8 +229,11 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
                   <Play className="h-3 w-3 shrink-0 text-primary" />
                   <span className="text-sm truncate">{kp.title}</span>
                 </div>
-                <Badge variant={kp.mastery >= 4 ? "default" : kp.mastery >= 2 ? "secondary" : "outline"}
-                  className="text-[10px]">{kp.mastery}/5</Badge>
+                {(() => {
+                  const m = masteryLabel(kp.mastery)
+                  const cls = m.color === "green" ? "bg-green-500 hover:bg-green-600" : m.color === "amber" ? "bg-amber-500 hover:bg-amber-600" : "bg-red-500 hover:bg-red-600"
+                  return <Badge className={`text-[10px] ${cls}`}>{m.label}</Badge>
+                })()}
               </CardContent>
             </Card>
           </Link>

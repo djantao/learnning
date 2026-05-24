@@ -510,3 +510,15 @@ model MindMap {
 
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 }
+
+model ModuleQuiz {
+  id        String   @id @default(cuid())
+  moduleId  String
+  userId    String
+  questions String   @default("[]")
+  answers   String   @default("[]")
+  results   String   @default("[]")
+  diagnosis String?
+  status    String   @default("generated")
+  createdAt DateTime @default(now())
+}

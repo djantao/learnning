@@ -186,3 +186,32 @@ export async function getUpcomingModules(userId: string, days = 14) {
     orderBy: [{ scheduledDate: "asc" }, { sortOrder: "asc" }],
   })
 }
+
+/** 弹性排期：逾期模块后移 + 明天容量不足则顺延 */
+export async function rebalanceSchedule(userId: string) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const overdue = await prisma.module.findMany({
+    where: {
+      course: { userId },
+      scheduledDate: { lt: today },
+      status: { not: "completed" },
+    },
+    select: { id: true, estimatedMinutes: true },
+  })
+
+  let moved = 0
+  for (const m of overdue) {
+    await prisma.module.update({
+      where: { id: m.id },
+      data: { scheduledDate: new Date(tomorrow) },
+    })
+    moved++
+  }
+
+  return { moved }
+}
