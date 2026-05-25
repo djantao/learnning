@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Brain, BookOpen, MessageSquare, TrendingUp, Target, AlertTriangle, Star, GraduationCap, Clock, CheckCircle2, ArrowRight } from "lucide-react"
-import { getTodayModules } from "@/lib/schedule"
+import { getTodayModules, rebalanceSchedule } from "@/lib/schedule"
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -13,6 +13,9 @@ export default async function DashboardPage() {
   if (!session?.user?.id) return null
   const userId = session.user.id
   const userName = session.user.name ?? session.user.email ?? "同学"
+
+  // 自动把逾期未完成的模块推到明天
+  await rebalanceSchedule(userId)
 
   // Real data queries - run in parallel
   const [

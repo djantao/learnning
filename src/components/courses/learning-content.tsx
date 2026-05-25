@@ -6,6 +6,7 @@ import { renderMarkdown } from "@/lib/markdown"
 import { FileText, PenLine, Loader2, RotateCw, GraduationCap } from "lucide-react"
 import { toast } from "sonner"
 import { PracticePanel } from "./practice-panel"
+import { parseContentLevels, hasContentForLevel, getContentForLevel } from "@/lib/ai/skills/content-levels"
 
 type ActiveTab = "content" | "practice"
 type Difficulty = "入门" | "进阶" | "高阶"
@@ -42,20 +43,23 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: "高阶", label: "高阶" },
 ]
 
-export function LearningContent({ title, content: initialContent, knowledgePointId, moduleTitle, courseTitle, mastery, onMasteryChange, firstOpenedAt: initialFirstOpenedAt, completedAt: initialCompletedAt }: LearningContentProps) {
+export function LearningContent({ title, content: rawContent, knowledgePointId, moduleTitle, courseTitle, mastery, onMasteryChange, firstOpenedAt: initialFirstOpenedAt, completedAt: initialCompletedAt }: LearningContentProps) {
   const [tab, setTab] = useState<ActiveTab>("content")
-  const [content, setContent] = useState(initialContent)
+  const [difficulty, setDifficulty] = useState<Difficulty>("入门")
   const [enriching, setEnriching] = useState(false)
   const [enrichError, setEnrichError] = useState(false)
-  const [difficulty, setDifficulty] = useState<Difficulty>("入门")
   const [firstOpenedAt, setFirstOpenedAt] = useState<string | null>(initialFirstOpenedAt ?? null)
   const [completedAt, setCompletedAt] = useState<string | null>(initialCompletedAt ?? null)
   const openedRef = useRef(false)
   const completedRef = useRef(false)
 
+  // 从原始 content 字段解析出当前难度的内容
+  const currentContent = getContentForLevel(rawContent, difficulty) || ""
+  const hasAnyContent = !!(getContentForLevel(rawContent, "入门") || getContentForLevel(rawContent, "进阶") || getContentForLevel(rawContent, "高阶"))
+
   // Record first time opening this knowledge point's content
   useEffect(() => {
-    if (openedRef.current || !initialContent || isThinContent(initialContent)) return
+    if (openedRef.current || !hasAnyContent || isThinContent(currentContent)) return
     openedRef.current = true
     const now = new Date().toISOString()
     setFirstOpenedAt(now)
@@ -64,7 +68,7 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ firstOpenedAt: now }),
     }).catch(() => {})
-  }, [knowledgePointId, initialContent])
+  }, [knowledgePointId, hasAnyContent])
 
   // Track completedAt from initial prop and auto-set when mastery reaches threshold
   useEffect(() => {
@@ -86,8 +90,9 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
     }).catch(() => {})
   }, [mastery, knowledgePointId])
 
+  // 自动生成：仅在没有任何难度有内容时才触发
   useEffect(() => {
-    if (!isThinContent(initialContent) || enriching || enrichError || !knowledgePointId) return
+    if (hasAnyContent || enriching || enrichError || !knowledgePointId) return
     let cancelled = false
     setEnriching(true)
     async function enrich() {
@@ -99,13 +104,21 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
         })
         if (!res.ok || cancelled) { setEnrichError(true); setEnriching(false); return }
         const data = await res.json()
-        if (!cancelled && data.content) setContent(data.content)
+        if (!cancelled && data.content) window.location.reload()
       } catch { if (!cancelled) setEnrichError(true) }
       if (!cancelled) setEnriching(false)
     }
     enrich()
     return () => { cancelled = true }
-  }, [initialContent, knowledgePointId, title, moduleTitle, courseTitle])
+  }, [hasAnyContent, knowledgePointId, title, moduleTitle, courseTitle])
+
+  async function switchDifficulty(level: Difficulty) {
+    setDifficulty(level)
+    // 如果新难度已有缓存内容，直接切换显示，不调 API
+    if (hasContentForLevel(rawContent, level)) return
+    // 否则触发生成
+    await regenerateContent(level)
+  }
 
   async function regenerateContent(level?: Difficulty) {
     if (enriching || !knowledgePointId) return
@@ -119,12 +132,12 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
       })
       if (!res.ok) throw new Error("Failed")
       const data = await res.json()
-      if (data.content) { setContent(data.content); toast.success(`已切换为${targetLevel}难度`) }
+      if (data.content) { toast.success(`已切换为${targetLevel}难度`); window.location.reload() }
     } catch { toast.error("重新生成失败") }
     setEnriching(false)
   }
 
-  const hasContent = content && content.trim().length > 0
+  const hasContent = currentContent && currentContent.trim().length > 0
 
   if (enriching) {
     return (
@@ -139,7 +152,7 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-sm text-muted-foreground">内容生成失败</p>
-        <Button variant="outline" size="sm" onClick={() => { setEnrichError(false); setContent(initialContent) }}>重试</Button>
+        <Button variant="outline" size="sm" onClick={() => { setEnrichError(false); window.location.reload() }}>重试</Button>
       </div>
     )
   }
@@ -189,7 +202,7 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
                   key={opt.value}
                   variant={difficulty === opt.value ? "secondary" : "ghost"}
                   size="sm"
-                  onClick={() => { setDifficulty(opt.value); regenerateContent(opt.value) }}
+                  onClick={() => switchDifficulty(opt.value)}
                   disabled={enriching}
                   className="text-xs h-7 px-2"
                 >
@@ -214,7 +227,7 @@ export function LearningContent({ title, content: initialContent, knowledgePoint
               {formatTime(completedAt) && <span>完成时间：{formatTime(completedAt)}</span>}
             </div>
             <div className="text-sm leading-relaxed prose prose-slate dark:prose-invert max-w-none">
-              {renderMarkdown(content)}
+              {renderMarkdown(currentContent)}
             </div>
           </div>
         </div>

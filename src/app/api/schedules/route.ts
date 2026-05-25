@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { getUpcomingModules } from "@/lib/schedule"
+import { getUpcomingModules, rebalanceSchedule } from "@/lib/schedule"
 import { NextResponse } from "next/server"
 
 export async function GET(req: Request) {
@@ -8,6 +8,8 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url)
   const days = parseInt(url.searchParams.get("days") || "14", 10)
+
+  await rebalanceSchedule(session.user.id)
 
   const modules = await getUpcomingModules(session.user.id, Math.min(days, 60))
 

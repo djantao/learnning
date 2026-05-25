@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { GraduationCap, Plus, BookOpen, Sparkles, Loader2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -21,7 +22,9 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
   const [newDesc, setNewDesc] = useState("")
   const [open, setOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
+  const [aiMode, setAiMode] = useState<"outline" | "topic">("outline")
   const [aiText, setAiText] = useState("")
+  const [aiTopicName, setAiTopicName] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
 
   async function createCourse() {
@@ -55,21 +58,32 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
   }
 
   async function aiGenerate() {
-    if (!aiText.trim() || aiText.trim().length < 10) {
-      toast.error("请输入至少 10 个字符的课程大纲")
-      return
+    if (aiMode === "topic") {
+      if (!aiTopicName.trim() || aiTopicName.trim().length < 2) {
+        toast.error("请输入至少 2 个字符的课程主题")
+        return
+      }
+    } else {
+      if (!aiText.trim() || aiText.trim().length < 10) {
+        toast.error("请输入至少 10 个字符的课程大纲")
+        return
+      }
     }
     setAiLoading(true)
     try {
+      const body = aiMode === "topic"
+        ? { mode: "topic", topicName: aiTopicName.trim() }
+        : { rawText: aiText }
       const res = await fetch("/api/ai/generate-course", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawText: aiText }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (res.ok && data.course) {
         setCourses([data.course, ...courses])
         setAiText("")
+        setAiTopicName("")
         setAiOpen(false)
         toast.success(`课程「${data.course.title}」已生成`)
       } else {
@@ -136,40 +150,49 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
                 AI 生成课程
               </DialogTitle>
               <DialogDescription>
-                粘贴结构化的课程大纲（支持 Markdown 表格、标题层级、嵌套列表等格式），AI 会自动解析并创建完整的课程结构。
+                粘贴结构化大纲让 AI 解析，或直接输入主题名让 AI 从零构建体系化课程。
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              <Textarea
-                className="min-h-[200px] max-h-[360px] font-mono text-sm"
-                placeholder={`粘贴你的课程大纲，例如：
+              <Tabs value={aiMode} onValueChange={(v) => setAiMode(v as "outline" | "topic")}>
+                <TabsList variant="line" className="w-full">
+                  <TabsTrigger value="outline" className="flex-1">📋 粘贴大纲</TabsTrigger>
+                  <TabsTrigger value="topic" className="flex-1">💡 输入主题</TabsTrigger>
+                </TabsList>
+                <TabsContent value="outline" className="pt-4">
+                  <Textarea
+                    className="min-h-[200px] max-h-[360px] font-mono text-sm"
+                    placeholder={`粘贴你的课程大纲，例如：
 
 # Kafka 完整学习体系
 
 | 模块 | 知识点 | 学习目标 |
 |------|--------|----------|
-| 前置知识 | 1. Linux基础<br>2. Java基础<br>3. 网络基础 | 补齐基础知识 |
-
-或者：
-
-- Python 入门
-  - 基础语法
-    - 变量与类型
-    - 控制流
-  - 函数与模块`}
-                value={aiText}
-                onChange={(e) => setAiText(e.target.value)}
-              />
+| 前置知识 | 1. Linux基础<br>2. Java基础<br>3. 网络基础 | 补齐基础知识 |`}
+                    value={aiText}
+                    onChange={(e) => setAiText(e.target.value)}
+                  />
+                </TabsContent>
+                <TabsContent value="topic" className="pt-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">输入你想学习的主题，AI 将自动构建完整的知识体系，覆盖从入门到进阶。</p>
+                  <Input
+                    placeholder="例如：Flink、Kubernetes、Rust、机器学习、Doris..."
+                    value={aiTopicName}
+                    onChange={(e) => setAiTopicName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && aiGenerate()}
+                  />
+                </TabsContent>
+              </Tabs>
               <Button onClick={aiGenerate} className="w-full" disabled={aiLoading}>
                 {aiLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    AI 正在解析大纲...
+                    {aiMode === "topic" ? "AI 正在构建知识体系..." : "AI 正在解析大纲..."}
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    开始生成
+                    {aiMode === "topic" ? "生成体系化课程" : "开始生成"}
                   </>
                 )}
               </Button>

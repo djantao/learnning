@@ -25,9 +25,10 @@ export async function POST(req: Request) {
 4. 所有内容必须贴合"${topicName}"领域的实际知识体系，禁止编造不存在的概念
 5. 模块标题要具体、可执行，不要用"概述""总结"这类空泛标题
 6. 每个知识点的 content 写 1-2 句话简要说明
+7. 每个模块需包含 estimatedMinutes（整数，单位分钟），根据知识点的深度和广度合理估算，参考：简单模块 10-20 分钟，中等模块 20-40 分钟，复杂模块 40-60 分钟
 
 输出纯JSON（不要markdown代码块）：
-{"title":"课程标题","description":"1-2句话概括课程定位和目标人群","modules":[{"title":"模块名","description":"学习目标","knowledgePoints":[{"title":"知识点标题","content":"1-2句简要说明"}]}]}`
+{"title":"课程标题","description":"1-2句话概括课程定位和目标人群","modules":[{"title":"模块名","description":"学习目标","estimatedMinutes":30,"knowledgePoints":[{"title":"知识点标题","content":"1-2句简要说明"}]}]}`
   } else if (rawText && rawText.trim().length >= 10) {
     // Outline mode: parse user-provided syllabus
     prompt = `你是一个课程结构解析器。请严格按照用户提供的大纲生成课程JSON。
@@ -118,6 +119,7 @@ ${rawText.slice(0, 4000)}`
         data: {
           courseId: course.id,
           title: mod.title,
+          estimatedMinutes: typeof mod.estimatedMinutes === "number" ? mod.estimatedMinutes : null,
           description: mod.description || null,
           sortOrder: sortOrder++,
         },
@@ -132,6 +134,7 @@ ${rawText.slice(0, 4000)}`
               courseId: course.id,
               parentModuleId: parentMod.id,
               title: child.title,
+              estimatedMinutes: typeof child.estimatedMinutes === "number" ? child.estimatedMinutes : null,
               description: child.description || null,
               sortOrder: childOrder++,
             },

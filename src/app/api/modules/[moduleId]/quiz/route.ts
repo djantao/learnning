@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { chatCompletion } from "@/lib/ai/client"
 import { quizGenPrompt } from "@/lib/ai/skills/quiz-generator"
+import { getContentPlain } from "@/lib/ai/skills/content-levels"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
 
@@ -34,7 +35,7 @@ export async function POST(
         childModules: { select: { id: true } },
       },
     })
-    const kps = m.knowledgePoints.filter((k) => k.content && k.content.trim().length > 0)
+    const kps = m.knowledgePoints.filter((k) => getContentPlain(k.content).trim().length > 0)
     for (const child of m.childModules) {
       kps.push(...(await collectKPs(child.id)))
     }

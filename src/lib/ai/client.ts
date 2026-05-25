@@ -1,13 +1,13 @@
 import OpenAI from "openai"
 
-const doubaoBaseURL = "https://ark.cn-beijing.volces.com/api/v3"
+const deepseekBaseURL = "https://api.deepseek.com"
 
 const client = new OpenAI({
-  baseURL: doubaoBaseURL,
-  apiKey: process.env.DOUBAO_API_KEY ?? "placeholder",
+  baseURL: deepseekBaseURL,
+  apiKey: process.env.DEEPSEEK_API_KEY ?? "placeholder",
 })
 
-const defaultModel = "doubao-seed-2-0-pro-260215"
+const defaultModel = "deepseek-chat"
 
 interface ChatParams {
   messages: { role: "user" | "assistant" | "system"; content: string }[]

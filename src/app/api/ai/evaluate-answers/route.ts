@@ -56,22 +56,12 @@ ${historyContext}
 学生答题情况：
 ${qaText}
 
-请逐题判断对错，给出中文正确答案和中文解析，然后给出中文总体评价和建议掌握度。所有文字内容必须使用中文。
+请逐题判断对错，给出正确答案和解析，然后给出总体评价和建议掌握度。
 
-输出纯 JSON（不要 markdown 代码块，不要英文）：
-{
-  "feedback": "总体评价（2-3句话）",
-  "suggestedScore": 3,
-  "details": [
-    {
-      "isCorrect": true,
-      "correctAnswer": "正确答案或要点",
-      "explanation": "解析说明"
-    }
-  ]
-}
+输出纯 JSON 对象，不要 markdown 代码块：
+{"feedback":"总体评价2-3句话","suggestedScore":3,"details":[{"isCorrect":true,"correctAnswer":"正确答案","explanation":"解析说明"}]}
 
-注意：details 数组长度必须与题目数量（${questions.length}）一致，按题目顺序排列。`
+注意：details 数组长度必须等于${questions.length}。字符串内容内部用中文引号「」代替英文双引号。JSON key 必须用英文双引号。`
 
   try {
     const result = await chatCompletion({

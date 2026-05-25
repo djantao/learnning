@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat/chat-panel"
 import { KpNotes } from "@/components/courses/kp-notes"
 import { LearningContent } from "@/components/courses/learning-content"
+import { MindMapView } from "@/components/courses/mindmap-view"
 import { XpCelebration } from "@/components/courses/xp-celebration"
 import { XP_PER_KP_MASTERED, xpToLevel, getLevelTitle } from "@/lib/gamification"
-import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight } from "lucide-react"
+import { toast } from "sonner"
+import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch } from "lucide-react"
 import Link from "next/link"
 
 interface KpData {
@@ -16,8 +19,11 @@ interface KpData {
   firstOpenedAt?: string | null
   completedAt?: string | null
   module: { id: string; title: string; courseId: string }
+  courseTitle: string
   prev: { id: string; title: string } | null
   next: { id: string; title: string } | null
+  isLastInModule?: boolean
+  moduleKpCount?: number
 }
 
 export function CurriculumChat({ kp }: { kp: KpData }) {
@@ -30,6 +36,11 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
   })
   const [showCelebration, setShowCelebration] = useState(false)
   const [xpGained, setXpGained] = useState(0)
+  const [showCompletionPrompt, setShowCompletionPrompt] = useState(false)
+  const [completionAction, setCompletionAction] = useState<"article" | "interview" | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [generatedContent, setGeneratedContent] = useState<{ title: string; content: string } | null>(null)
+  const [mindmapOpen, setMindmapOpen] = useState(false)
 
   useEffect(() => {
     setMastery(kp.mastery)
@@ -73,6 +84,11 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
           }),
         })
       } catch { /* non-critical */ }
+
+      // Trigger module completion prompt if last KP in module
+      if (kp.isLastInModule) {
+        setShowCompletionPrompt(true)
+      }
     }
   }
 
@@ -100,11 +116,14 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
                 <Button variant="ghost" size="icon" className="h-8 w-8" title={kp.next.title}><ArrowRight className="h-4 w-4" /></Button>
               </Link>
             )}
+            <Button variant="outline" size="sm" onClick={() => setMindmapOpen(true)} className="gap-1.5 text-xs">
+              <GitBranch className="h-3.5 w-3.5" />思维导图
+            </Button>
             <Button
               variant={chatOpen ? "secondary" : "outline"}
               size="sm"
               onClick={() => setChatOpen(!chatOpen)}
-              className="gap-1.5 text-xs ml-2"
+              className="gap-1.5 text-xs"
             >
               {chatOpen ? <X className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
               {chatOpen ? "关闭" : "问 AI 老师"}
@@ -120,6 +139,7 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
               content={kp.content}
               knowledgePointId={kp.id}
               moduleTitle={kp.module.title}
+              courseTitle={kp.courseTitle}
               mastery={mastery}
               onMasteryChange={updateMastery}
               firstOpenedAt={kp.firstOpenedAt}
@@ -173,6 +193,118 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
         totalXp={totalXp}
         onClose={() => setShowCelebration(false)}
       />
+
+      {/* Module Completion Dialog */}
+      <Dialog open={showCompletionPrompt} onOpenChange={setShowCompletionPrompt}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              模块学习完成！
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              你已经完成了「{kp.module.title}」模块的{(kp as any).moduleKpCount || ""}个知识点。太棒了！
+            </p>
+            <p className="text-sm">选择一个输出方式巩固所学：</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className="justify-start gap-3 h-auto py-3"
+                onClick={async () => {
+                  setCompletionAction("article")
+                  setGenerating(true)
+                  try {
+                    const modRes = await fetch(`/api/modules/${kp.module.id}`)
+                    const modData = await modRes.json()
+                    const res = await fetch("/api/ai/generate-article", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        moduleId: kp.module.id,
+                        courseTitle: kp.courseTitle,
+                        moduleTitle: kp.module.title,
+                      }),
+                    })
+                    const data = await res.json()
+                    if (data.title) {
+                      setGeneratedContent(data)
+                      await fetch("/api/notes", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          title: data.title,
+                          content: data.content,
+                          tags: ["learning-output"],
+                        }),
+                      })
+                      toast.success("文章已生成并保存为笔记")
+                    }
+                  } catch { toast.error("文章生成失败") }
+                  setGenerating(false)
+                }}
+                disabled={generating}
+              >
+                <FileText className="h-5 w-5 text-blue-500" />
+                <div className="text-left">
+                  <p className="font-medium text-sm">撰写学习文章</p>
+                  <p className="text-xs text-muted-foreground">生成一篇专业技术文章总结所学内容</p>
+                </div>
+                {generating && completionAction === "article" && <Loader2 className="h-4 w-4 animate-spin ml-auto" />}
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start gap-3 h-auto py-3"
+                onClick={async () => {
+                  setCompletionAction("interview")
+                  setGenerating(true)
+                  try {
+                    const res = await fetch("/api/ai/generate-questions", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ knowledgePointId: kp.id, style: "interview" }),
+                    })
+                    const data = await res.json()
+                    if (data.questions) {
+                      setGeneratedContent({ title: "面试自检", content: data.questions.join("\n\n") })
+                      toast.success("面试题已生成")
+                    }
+                  } catch { toast.error("题目生成失败") }
+                  setGenerating(false)
+                }}
+                disabled={generating}
+              >
+                <MessageCircle className="h-5 w-5 text-purple-500" />
+                <div className="text-left">
+                  <p className="font-medium text-sm">面试自检</p>
+                  <p className="text-xs text-muted-foreground">生成面试风格的问题进行自我检测</p>
+                </div>
+                {generating && completionAction === "interview" && <Loader2 className="h-4 w-4 animate-spin ml-auto" />}
+              </Button>
+            </div>
+            {generatedContent && (
+              <div className="border rounded-lg p-3 max-h-40 overflow-y-auto">
+                <p className="text-xs font-medium mb-1">{generatedContent.title}</p>
+                <p className="text-xs text-muted-foreground line-clamp-3">{generatedContent.content.slice(0, 300)}</p>
+              </div>
+            )}
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => setShowCompletionPrompt(false)}>
+              稍后再说
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mind Map Dialog */}
+      <Dialog open={mindmapOpen} onOpenChange={setMindmapOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>思维导图 — {kp.module.title}</DialogTitle>
+          </DialogHeader>
+          <MindMapView moduleId={kp.module.id} />
+        </DialogContent>
+      </Dialog>
 
       {/* AI Chat slide-out panel */}
       {chatOpen && (
