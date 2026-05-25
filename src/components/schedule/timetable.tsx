@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { ChevronLeft, ChevronRight, Clock, GraduationCap, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Clock, GraduationCap, AlertTriangle, CheckCircle2, X } from "lucide-react"
 import Link from "next/link"
 
 interface ScheduledModule {
@@ -54,12 +54,20 @@ export function Timetable() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [modules, setModules] = useState<ScheduledModule[]>([])
   const [loading, setLoading] = useState(true)
+  const [rebalance, setRebalance] = useState<{ moved: number; details: { moduleId: string; title: string; courseTitle: string; scheduledDate: string; overdueDays: number }[] } | null>(null)
+  const [showOverdueBanner, setShowOverdueBanner] = useState(true)
 
   useEffect(() => {
     setLoading(true)
     fetch("/api/schedules?days=28")
       .then((r) => r.json())
-      .then((data) => setModules(data.modules || []))
+      .then((data) => {
+        setModules(data.modules || [])
+        if (data.rebalance?.moved > 0) {
+          setRebalance(data.rebalance)
+          setShowOverdueBanner(true)
+        }
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -94,13 +102,21 @@ export function Timetable() {
 
   const today = formatDate(new Date())
 
+  function calcOverdueDays(m: ScheduledModule): number {
+    if (!m.scheduledDate || m.status === "completed") return 0
+    const d = new Date(m.scheduledDate)
+    const t = new Date(today)
+    if (d >= t) return 0
+    return Math.ceil((t.getTime() - d.getTime()) / 86400000)
+  }
+
   function statusBadge(m: ScheduledModule) {
-    const isOverdue = m.scheduledDate && m.scheduledDate < today && m.status !== "completed"
+    const overdueDays = calcOverdueDays(m)
     if (m.status === "completed") {
       return <Badge className="bg-green-500 hover:bg-green-600 text-[10px]"><CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />已完成</Badge>
     }
-    if (isOverdue) {
-      return <Badge className="bg-red-500 hover:bg-red-600 text-[10px]"><AlertTriangle className="h-2.5 w-2.5 mr-0.5" />延期</Badge>
+    if (overdueDays > 0) {
+      return <Badge className="bg-red-500 hover:bg-red-600 text-[10px]"><AlertTriangle className="h-2.5 w-2.5 mr-0.5" />逾期 {overdueDays} 天</Badge>
     }
     if (m.status === "in_progress") {
       return <Badge variant="secondary" className="text-[10px]">学习中</Badge>
@@ -134,6 +150,36 @@ export function Timetable() {
             disabled={weekOffset === 0}>今天</Button>
         </div>
       </div>
+
+      {/* Overdue Rebalance Banner */}
+      {rebalance && showOverdueBanner && (
+        <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
+          <CardContent className="flex items-start justify-between py-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                  排期逾期调整 — {rebalance.moved} 个模块已自动移至明天
+                </p>
+                <div className="text-xs text-red-600 dark:text-red-400 mt-1 space-y-0.5">
+                  {rebalance.details.slice(0, 5).map((d) => (
+                    <p key={d.moduleId}>
+                      {d.courseTitle} &gt; {d.title}
+                      <span className="font-semibold ml-1">（逾期 {d.overdueDays} 天）</span>
+                    </p>
+                  ))}
+                  {rebalance.details.length > 5 && (
+                    <p className="text-muted-foreground">... 还有 {rebalance.details.length - 5} 个</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setShowOverdueBanner(false)}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <Card>

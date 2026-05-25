@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Bell, BellDot, BookOpen, Award, Calendar, Sparkles } from "lucide-react"
+import { Bell, BellDot, BookOpen, Award, Calendar, Sparkles, AlertTriangle } from "lucide-react"
 
 interface Reminder {
   id: string
@@ -25,6 +25,8 @@ const typeIcons: Record<string, React.ReactNode> = {
   review: <Calendar className="h-3.5 w-3.5 text-amber-500" />,
   study: <BookOpen className="h-3.5 w-3.5 text-blue-500" />,
   achievement: <Award className="h-3.5 w-3.5 text-green-500" />,
+  schedule_overdue: <AlertTriangle className="h-3.5 w-3.5 text-red-500" />,
+  deadline_warning: <Calendar className="h-3.5 w-3.5 text-orange-500" />,
   system: <Sparkles className="h-3.5 w-3.5 text-purple-500" />,
 }
 

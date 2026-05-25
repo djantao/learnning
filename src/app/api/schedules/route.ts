@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const days = parseInt(url.searchParams.get("days") || "14", 10)
 
-  await rebalanceSchedule(session.user.id)
+  const rebalance = await rebalanceSchedule(session.user.id)
 
   const modules = await getUpcomingModules(session.user.id, Math.min(days, 60))
 
@@ -21,5 +21,5 @@ export async function GET(req: Request) {
     grouped[key].push(m)
   }
 
-  return NextResponse.json({ modules, grouped })
+  return NextResponse.json({ modules, grouped, rebalance })
 }

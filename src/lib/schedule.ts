@@ -1,4 +1,5 @@
 import { prisma } from "./db"
+import { sendReminderEmail } from "./email"
 
 interface FlatModule {
   id: string
@@ -9,6 +10,14 @@ interface FlatModule {
 interface ScheduleAssignment {
   moduleId: string
   scheduledDate: Date
+}
+
+export interface OverdueDetail {
+  moduleId: string
+  title: string
+  courseTitle: string
+  scheduledDate: Date
+  overdueDays: number
 }
 
 function fmtDate(d: Date): string {
@@ -187,7 +196,7 @@ export async function getUpcomingModules(userId: string, days = 14) {
   })
 }
 
-/** 弹性排期：逾期模块后移 + 明天容量不足则顺延 */
+/** 弹性排期：逾期模块后移 + 明天容量不足则顺延。返回移动详情供 UI 展示逾期天数 */
 export async function rebalanceSchedule(userId: string) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -201,17 +210,80 @@ export async function rebalanceSchedule(userId: string) {
       scheduledDate: { lt: today },
       status: { not: "completed" },
     },
-    select: { id: true, estimatedMinutes: true },
+    select: {
+      id: true,
+      title: true,
+      estimatedMinutes: true,
+      scheduledDate: true,
+      course: { select: { id: true, title: true } },
+    },
   })
 
-  let moved = 0
+  const details: OverdueDetail[] = []
+
   for (const m of overdue) {
+    const overdueDays = m.scheduledDate
+      ? Math.ceil((today.getTime() - new Date(m.scheduledDate).getTime()) / 86400000)
+      : 0
+
+    details.push({
+      moduleId: m.id,
+      title: m.title,
+      courseTitle: m.course.title,
+      scheduledDate: m.scheduledDate!,
+      overdueDays,
+    })
+
     await prisma.module.update({
       where: { id: m.id },
       data: { scheduledDate: new Date(tomorrow) },
     })
-    moved++
   }
 
-  return { moved }
+  // 创建提醒 + 发邮件通知
+  if (details.length > 0) {
+    const todayStr = today.toLocaleDateString("zh-CN")
+    const notificationExist = await prisma.reminder.findFirst({
+      where: { userId, type: "schedule_overdue", createdAt: { gte: today } },
+    })
+    if (!notificationExist) {
+      const totalDays = details.reduce((s, d) => s + d.overdueDays, 0)
+      const firstFew = details.slice(0, 5)
+      const moduleList = firstFew
+        .map((d) => `- ${d.courseTitle} > ${d.title}（原排期 ${d.scheduledDate.toLocaleDateString("zh-CN")}，已逾期 ${d.overdueDays} 天）`)
+        .join("\n")
+
+      await prisma.reminder.create({
+        data: {
+          userId,
+          type: "schedule_overdue",
+          title: `${details.length} 个模块逾期（累计 ${totalDays} 天），已自动后移`,
+          message: `${todayStr} 自动调整：\n${moduleList}${details.length > 5 ? `\n... 还有 ${details.length - 5} 个` : ""}\n\n已统一移至明天（${tomorrow.toLocaleDateString("zh-CN")}），请合理安排学习时间。`,
+          link: "/schedule",
+        },
+      })
+
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } })
+      if (user?.email) {
+        const emailHtml = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;">
+<h3 style="color:#e74c3c;">学习排期逾期提醒</h3>
+<p>${user.name ?? "同学"}，以下 ${details.length} 个学习模块已逾期：</p>
+<table style="width:100%;border-collapse:collapse;">
+<tr style="background:#f5f5f5;"><th style="padding:8px;text-align:left;border:1px solid #ddd;">模块</th><th style="padding:8px;text-align:left;border:1px solid #ddd;">原排期</th><th style="padding:8px;text-align:center;border:1px solid #ddd;">逾期天数</th></tr>
+${details.map((d) => `<tr><td style="padding:8px;border:1px solid #ddd;">${d.courseTitle} > ${d.title}</td><td style="padding:8px;border:1px solid #ddd;">${d.scheduledDate.toLocaleDateString("zh-CN")}</td><td style="padding:8px;text-align:center;border:1px solid #ddd;color:#e74c3c;font-weight:bold;">${d.overdueDays} 天</td></tr>`).join("")}
+</table>
+<p style="margin-top:16px;">已自动移至 <strong>${tomorrow.toLocaleDateString("zh-CN")}</strong>，请合理安排学习时间。</p>
+<p style="color:#999;font-size:12px;"><a href="https://learnning-rho.vercel.app/schedule">查看课表</a></p>
+</div>`
+        await sendReminderEmail(
+          userId,
+          user.email,
+          `[MindForge] ${details.length} 个模块逾期 ${totalDays} 天，已自动后移`,
+          emailHtml,
+        )
+      }
+    }
+  }
+
+  return { moved: details.length, details }
 }
