@@ -90,9 +90,9 @@ export function LearningContent({ title, content: rawContent, knowledgePointId, 
     }).catch(() => {})
   }, [mastery, knowledgePointId])
 
-  // 自动生成：仅在没有任何难度有内容时才触发
+  // 自动生成：当前难度无内容时触发（即使其他难度已有内容）
   useEffect(() => {
-    if (hasAnyContent || enriching || enrichError || !knowledgePointId) return
+    if (hasContentForLevel(rawContent, difficulty) || enriching || enrichError || !knowledgePointId) return
     let cancelled = false
     setEnriching(true)
     async function enrich() {
@@ -110,7 +110,7 @@ export function LearningContent({ title, content: rawContent, knowledgePointId, 
     }
     enrich()
     return () => { cancelled = true }
-  }, [hasAnyContent, knowledgePointId, title, moduleTitle, courseTitle])
+  }, [rawContent, difficulty, knowledgePointId, title, moduleTitle, courseTitle])
 
   async function switchDifficulty(level: Difficulty) {
     setDifficulty(level)
