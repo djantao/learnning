@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Play, Pause, SkipForward, Headphones } from "lucide-react"
+import { Loader2, Play, Pause, SkipForward, Headphones, VolumeX } from "lucide-react"
 import { toast } from "sonner"
 
 interface Segment {
@@ -16,77 +16,101 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
   const [loading, setLoading] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(-1)
-  const currentIdxRef = useRef(-1)
+  const [voicesReady, setVoicesReady] = useState(false)
   const playingRef = useRef(false)
-  const voicesReady = useRef(false)
+  const cancelRef = useRef(false)
 
+  // 等待语音库加载完成
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return
-    const loadVoices = () => {
-      window.speechSynthesis.getVoices()
-      voicesReady.current = true
+
+    const voices = window.speechSynthesis.getVoices()
+    if (voices.length > 0) {
+      setVoicesReady(true)
+      return
     }
-    loadVoices()
-    window.speechSynthesis.onvoiceschanged = loadVoices
+
+    const onVoicesChanged = () => {
+      if (window.speechSynthesis.getVoices().length > 0) {
+        setVoicesReady(true)
+      }
+    }
+    window.speechSynthesis.onvoiceschanged = onVoicesChanged
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null
+    }
   }, [])
 
-  function getVoices(): { male: SpeechSynthesisVoice | null; female: SpeechSynthesisVoice | null } {
+  function pickVoice(gender: "male" | "female"): SpeechSynthesisVoice | null {
     const voices = window.speechSynthesis.getVoices()
-    const huihui = voices.find((v) => v.name.includes("Huihui")) || voices.find((v) => v.lang === "zh-CN" && v.name.includes("Female"))
-    const yunyang = voices.find((v) => v.name.includes("Yunyang")) || voices.find((v) => v.lang === "zh-CN" && v.name.includes("Male"))
+    if (voices.length === 0) return null
+
     const zhVoices = voices.filter((v) => v.lang.startsWith("zh"))
-    return {
-      female: huihui || zhVoices[0] || null,
-      male: yunyang || zhVoices[1] || zhVoices[0] || null,
+    if (zhVoices.length > 0) {
+      if (gender === "female") {
+        return zhVoices.find((v) => v.name.includes("Huihui") || v.name.toLowerCase().includes("female")) || zhVoices[0]
+      }
+      return zhVoices.find((v) => v.name.includes("Yunyang") || v.name.toLowerCase().includes("male")) || zhVoices[0]
     }
+
+    return voices.find((v) => v.default) || voices[0]
   }
 
   const speakSegment = useCallback(
-    (idx: number): Promise<void> => {
-      return new Promise((resolve) => {
-        if (idx >= segments.length || !playingRef.current) {
-          setCurrentIdx(-1)
-          currentIdxRef.current = -1
-          setPlaying(false)
-          playingRef.current = false
-          resolve()
-          return
-        }
+    (idx: number): void => {
+      if (idx >= segments.length || cancelRef.current || !playingRef.current) {
+        setPlaying(false)
+        playingRef.current = false
+        setCurrentIdx(-1)
+        return
+      }
 
-        const seg = segments[idx]
-        const { male, female } = getVoices()
-        const voice = seg.speaker === "小明" ? male : female
+      const seg = segments[idx]
+      if (!seg) {
+        speakSegment(idx + 1)
+        return
+      }
 
-        const u = new SpeechSynthesisUtterance(seg.text)
-        u.lang = "zh-CN"
-        u.rate = 1.05
-        if (voice) u.voice = voice
-        u.onend = () => {
-          currentIdxRef.current = idx + 1
-          setCurrentIdx(idx + 1)
-          resolve(speakSegment(idx + 1))
-        }
-        u.onerror = () => {
-          currentIdxRef.current = idx + 1
-          setCurrentIdx(idx + 1)
-          resolve(speakSegment(idx + 1))
-        }
+      const voice = pickVoice(seg.speaker === "小明" ? "male" : "female")
 
-        window.speechSynthesis.speak(u)
-      })
+      const u = new SpeechSynthesisUtterance(seg.text)
+      u.lang = "zh-CN"
+      u.rate = 1.05
+      u.volume = 1
+      if (voice) u.voice = voice
+
+      u.onstart = () => {
+        setCurrentIdx(idx)
+      }
+
+      u.onend = () => {
+        if (!cancelRef.current && playingRef.current) {
+          speakSegment(idx + 1)
+        }
+      }
+
+      u.onerror = (e) => {
+        if (e.error !== "interrupted" && e.error !== "canceled") {
+          console.warn("Speech error:", e.error)
+        }
+        if (!cancelRef.current && playingRef.current) {
+          speakSegment(idx + 1)
+        }
+      }
+
+      window.speechSynthesis.speak(u)
     },
     [segments],
   )
 
-  const startPlayback = useCallback(async () => {
-    if (segments.length === 0) return
+  const startPlayback = useCallback(() => {
+    if (segments.length === 0 || !voicesReady) return
     window.speechSynthesis.cancel()
+    cancelRef.current = false
     playingRef.current = true
     setPlaying(true)
-    currentIdxRef.current = 0
-    setCurrentIdx(0)
-    await speakSegment(0)
-  }, [segments, speakSegment])
+    speakSegment(0)
+  }, [segments, speakSegment, voicesReady])
 
   const pausePlayback = useCallback(() => {
     window.speechSynthesis.pause()
@@ -94,18 +118,18 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
     playingRef.current = false
   }, [])
 
-  const resumePlayback = useCallback(async () => {
+  const resumePlayback = useCallback(() => {
     playingRef.current = true
     setPlaying(true)
     window.speechSynthesis.resume()
   }, [])
 
   const stopPlayback = useCallback(() => {
+    cancelRef.current = true
     window.speechSynthesis.cancel()
     setPlaying(false)
     playingRef.current = false
     setCurrentIdx(-1)
-    currentIdxRef.current = -1
   }, [])
 
   async function generate() {
@@ -123,6 +147,10 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
         return
       }
       const data = await res.json()
+      if (!data.segments || data.segments.length === 0) {
+        toast.error("播客内容为空，请重试")
+        return
+      }
       setSegments(data.segments || [])
       setTitle(data.title || "")
       toast.success("播客已生成，点击播放")
@@ -134,7 +162,14 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
 
   const supported = typeof window !== "undefined" && "speechSynthesis" in window
 
-  if (!supported) return null
+  if (!supported) {
+    return (
+      <Button variant="ghost" size="sm" disabled className="gap-1.5 text-xs">
+        <VolumeX className="h-3.5 w-3.5" />
+        不支持语音
+      </Button>
+    )
+  }
 
   return (
     <div className="flex items-center gap-1">
@@ -158,10 +193,11 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
             variant="ghost"
             size="sm"
             onClick={playing ? pausePlayback : resumePlayback}
+            disabled={!voicesReady}
             className="gap-1.5 text-xs h-7 px-2"
           >
             {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {playing ? "暂停" : "播放"}播客
+            {playing ? "暂停" : voicesReady ? "播放" : "加载语音..."}播客
           </Button>
           <Button variant="ghost" size="sm" onClick={stopPlayback} className="h-7 w-7 p-0" title="停止">
             <SkipForward className="h-3 w-3" />
