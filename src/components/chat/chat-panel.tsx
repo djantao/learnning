@@ -280,7 +280,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle }
                   {msg.role === "user" ? (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
                   ) : (
-                    msg.content ? renderMarkdown(msg.content) : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
+                    msg.content ? <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} /> : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
                   )}
                   {msg.role === "assistant" && msg.content && !msg.content.startsWith("你好！我是") && (
                     <button

@@ -1,5 +1,5 @@
-export function renderMarkdown(md: string) {
-  if (!md) return null
+export function renderMarkdown(md: string): string {
+  if (!md) return ""
 
   let html = md
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -15,6 +15,5 @@ export function renderMarkdown(md: string) {
     .replace(/\n\n/g, "</p><p class='my-2'>")
     .replace(/\n/g, "<br/>")
 
-  return <div className="prose prose-sm dark:prose-invert max-w-none"
-    dangerouslySetInnerHTML={{ __html: `<p class='my-2'>${html}</p>` }} />
+  return `<p class='my-2'>${html}</p>`
 }

@@ -112,8 +112,8 @@ export function PromptTester({ courses }: { courses: CourseItem[] }) {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-2">V2 输出 <Badge variant="secondary">{difficulty}</Badge></CardTitle>
             </CardHeader>
-            <CardContent className="prose prose-sm dark:prose-invert max-w-none">
-              {renderMarkdown(result.content)}
+            <CardContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.content) }} />
             </CardContent>
           </Card>
         </div>

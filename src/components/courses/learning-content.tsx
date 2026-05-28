@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { renderMarkdown } from "@/lib/markdown"
-import { FileText, PenLine, Loader2, RotateCw, GraduationCap } from "lucide-react"
+import { MarkdownContent } from "./markdown-content"
+import { MermaidBlock } from "@/components/mermaid-block"
+import { FileText, PenLine, Loader2, RotateCw, GraduationCap, GitGraph, FileDown } from "lucide-react"
 import { toast } from "sonner"
 import { PracticePanel } from "./practice-panel"
+import { PodcastPlayer } from "./podcast-player"
+import { LearningTabs } from "./learning-tabs"
 import { parseContentLevels, hasContentForLevel, getContentForLevel } from "@/lib/ai/skills/content-levels"
+import { buildPptxBlob } from "@/lib/pptx-builder"
 
 type ActiveTab = "content" | "practice"
 type Difficulty = "入门" | "进阶" | "高阶"
@@ -37,6 +41,51 @@ function formatTime(iso: string | null | undefined) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function parseSlidesFromMd(md: string): { title: string; bullets: string[] }[] {
+  if (!md) return []
+  const parts = md.split(/(?=^## )/m)
+  const slides: { title: string; bullets: string[] }[] = []
+
+  for (const part of parts) {
+    const lines = part.trim().split("\n")
+    const heading = lines[0]?.replace(/^## /, "").trim() || "概述"
+    const body = lines.slice(1).join("\n").trim()
+
+    // Extract bullet points
+    const bulletLines = body
+      .split("\n")
+      .filter((l) => /^[-*]\s/.test(l))
+      .map((l) => l.replace(/^[-*]\s+/, "").trim())
+      .filter((b) => b.length > 0)
+      .slice(0, 8)
+
+    if (bulletLines.length > 0) {
+      slides.push({ title: heading, bullets: bulletLines })
+    } else {
+      // No bullets: use first paragraph split by sentences
+      const cleaned = body.replace(/^#{1,4}\s.*$/gm, "").replace(/\*\*(.+?)\*\*/g, "$1").trim()
+      const sentences = cleaned.split(/[。！？]/).filter((s) => s.trim().length > 3).map((s) => s.trim()).slice(0, 6)
+      slides.push({ title: heading, bullets: sentences.length > 0 ? sentences : [cleaned.slice(0, 200)] })
+    }
+  }
+
+  return slides
+}
+
+async function downloadPptxBlob(title: string, md: string, courseTitle?: string) {
+  const slides = parseSlidesFromMd(md)
+  if (slides.length === 0) return
+  const blob = await buildPptxBlob(slides, courseTitle)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${title}.pptx`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: "入门", label: "入门" },
   { value: "进阶", label: "进阶" },
@@ -48,6 +97,10 @@ export function LearningContent({ title, content: rawContent, knowledgePointId, 
   const [difficulty, setDifficulty] = useState<Difficulty>("入门")
   const [enriching, setEnriching] = useState(false)
   const [enrichError, setEnrichError] = useState(false)
+  const [diagramCode, setDiagramCode] = useState<string | null>(null)
+  const [diagramOpen, setDiagramOpen] = useState(false)
+  const [diagramGenerating, setDiagramGenerating] = useState(false)
+  const [downloadingPpt, setDownloadingPpt] = useState(false)
   const [firstOpenedAt, setFirstOpenedAt] = useState<string | null>(initialFirstOpenedAt ?? null)
   const [completedAt, setCompletedAt] = useState<string | null>(initialCompletedAt ?? null)
   const openedRef = useRef(false)
@@ -137,6 +190,42 @@ export function LearningContent({ title, content: rawContent, knowledgePointId, 
     setEnriching(false)
   }
 
+  async function generateDiagram() {
+    if (diagramGenerating || !knowledgePointId) return
+    setDiagramGenerating(true)
+    setDiagramOpen(true)
+    setDiagramCode(null)
+    try {
+      const res = await fetch("/api/ai/generate-diagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ knowledgePointId }),
+      })
+      if (!res.ok) throw new Error("Failed")
+      const data = await res.json()
+      if (data.mermaid) {
+        setDiagramCode(data.mermaid)
+      } else {
+        toast.error("图表生成失败")
+        setDiagramOpen(false)
+      }
+    } catch {
+      toast.error("图表生成失败")
+      setDiagramOpen(false)
+    }
+    setDiagramGenerating(false)
+  }
+
+  async function handleDownloadPpt() {
+    setDownloadingPpt(true)
+    try {
+      await downloadPptxBlob(title, currentContent, courseTitle || moduleTitle)
+    } catch {
+      toast.error("PPT导出失败")
+    }
+    setDownloadingPpt(false)
+  }
+
   const hasContent = currentContent && currentContent.trim().length > 0
 
   if (enriching) {
@@ -210,27 +299,42 @@ export function LearningContent({ title, content: rawContent, knowledgePointId, 
                 </Button>
               ))}
             </div>
+            <div className="w-px h-5 bg-border mx-1" />
+            <PodcastPlayer knowledgePointId={knowledgePointId} />
+            <div className="w-px h-5 bg-border mx-1" />
+            <Button variant="ghost" size="sm" onClick={generateDiagram} disabled={diagramGenerating} className="gap-1.5 text-xs">
+              {diagramGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitGraph className="h-3.5 w-3.5" />}
+              图示
+            </Button>
+            <div className="w-px h-5 bg-border mx-1" />
+            <Button variant="ghost" size="sm" onClick={handleDownloadPpt} disabled={downloadingPpt} className="gap-1.5 text-xs">
+              {downloadingPpt ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+              PPT
+            </Button>
           </>
         )}
       </div>
 
       {/* Tab content */}
       {tab === "content" ? (
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-6 py-6">
-            <h1 className="text-2xl font-bold mb-2">{title}</h1>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <span>学习内容</span><span>·</span><span>AI 生成</span>
+        <LearningTabs
+          content={currentContent}
+          renderSection={(sectionMd) => (
+            <div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                <span>学习内容</span><span>·</span><span>AI 生成</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground/70 mb-6">
+                {formatTime(firstOpenedAt) && <span>首次打开：{formatTime(firstOpenedAt)}</span>}
+                {formatTime(completedAt) && <span>完成时间：{formatTime(completedAt)}</span>}
+              </div>
+              <h1 className="text-2xl font-bold mb-6">{title}</h1>
+              <div className="text-sm leading-relaxed prose prose-slate dark:prose-invert max-w-none">
+                <MarkdownContent content={sectionMd} />
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground/70 mb-6">
-              {formatTime(firstOpenedAt) && <span>首次打开：{formatTime(firstOpenedAt)}</span>}
-              {formatTime(completedAt) && <span>完成时间：{formatTime(completedAt)}</span>}
-            </div>
-            <div className="text-sm leading-relaxed prose prose-slate dark:prose-invert max-w-none">
-              {renderMarkdown(currentContent)}
-            </div>
-          </div>
-        </div>
+          )}
+        />
       ) : (
         <div className="flex-1 overflow-hidden">
           <PracticePanel
@@ -239,6 +343,31 @@ export function LearningContent({ title, content: rawContent, knowledgePointId, 
             mastery={mastery}
             onMasteryChange={onMasteryChange}
           />
+        </div>
+      )}
+
+      {/* Diagram panel */}
+      {diagramOpen && (
+        <div className="border-t bg-card/30 shrink-0">
+          <div className="flex items-center justify-between px-4 py-2 border-b bg-card/50">
+            <span className="text-xs font-medium text-muted-foreground">知识图示</span>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={generateDiagram} disabled={diagramGenerating} className="text-xs h-7">
+                {diagramGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                重新生成
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setDiagramOpen(false)} className="text-xs h-7">收起</Button>
+            </div>
+          </div>
+          <div className="max-h-80 overflow-y-auto px-6 py-4">
+            {diagramGenerating && !diagramCode ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" /> AI 正在生成图表...
+              </div>
+            ) : diagramCode ? (
+              <MermaidBlock code={diagramCode} />
+            ) : null}
+          </div>
         </div>
       )}
     </div>
