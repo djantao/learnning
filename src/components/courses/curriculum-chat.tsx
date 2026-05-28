@@ -101,9 +101,9 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
           <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
             <Link href={`/courses/${kp.module.courseId}`} className="text-muted-foreground hover:text-foreground shrink-0">课程</Link>
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground truncate">{kp.module.title}</span>
+            <span className="text-muted-foreground truncate" title={kp.module.title}>{kp.module.title}</span>
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="font-medium truncate">{kp.title}</span>
+            <span className="font-medium truncate" title={kp.title}>{kp.title}</span>
           </div>
           <div className="flex gap-1 shrink-0 ml-2">
             {kp.prev && (

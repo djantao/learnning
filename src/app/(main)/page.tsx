@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Brain, BookOpen, MessageSquare, TrendingUp, Target, AlertTriangle, Star, GraduationCap, Clock, CheckCircle2, ArrowRight } from "lucide-react"
+import { Brain, BookOpen, MessageSquare, TrendingUp, Target, AlertTriangle, Star, GraduationCap, Clock, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react"
 import { getTodayModules, rebalanceSchedule } from "@/lib/schedule"
 import Link from "next/link"
 
@@ -18,6 +18,14 @@ export default async function DashboardPage() {
   await rebalanceSchedule(userId)
 
   // Real data queries - run in parallel
+  // 逾期模块：排期在今天之前但未完成
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay())
+  startOfWeek.setHours(0, 0, 0, 0)
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(endOfWeek.getDate() + 7)
+
   const [
     dueCardsCount,
     totalCardsCount,
@@ -30,6 +38,8 @@ export default async function DashboardPage() {
     activityDates,
     lastStudiedKp,
     todaySchedule,
+    overdueModules,
+    weeklyCompletedKps,
   ] = await Promise.all([
     prisma.flashcard.count({ where: { userId, isSuspended: false, sm2NextReview: { lte: new Date() } } }),
     prisma.flashcard.count({ where: { userId, isSuspended: false } }),
@@ -46,6 +56,16 @@ export default async function DashboardPage() {
       include: { module: { include: { course: { select: { id: true, title: true } } } } },
     }),
     getTodayModules(userId),
+    prisma.module.findMany({
+      where: { course: { userId }, scheduledDate: { lt: now }, status: { not: "completed" } },
+      include: { course: { select: { id: true, title: true, icon: true, color: true } } },
+      orderBy: { scheduledDate: "asc" },
+    }),
+    prisma.knowledgePoint.findMany({
+      where: { module: { course: { userId } }, completedAt: { gte: startOfWeek, lt: endOfWeek } },
+      include: { module: { include: { course: { select: { id: true, title: true, icon: true, color: true } } } } },
+      orderBy: { completedAt: "desc" },
+    }),
   ])
 
   const cardsDue = dueCardsCount
@@ -217,6 +237,45 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
+      {/* Overdue Alert */}
+      {overdueModules.length > 0 && (
+        <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
+          <CardContent className="py-3">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                  你有 {overdueModules.length} 个逾期模块未完成
+                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {overdueModules.slice(0, 6).map((m) => {
+                    const overdueDays = Math.ceil((now.getTime() - new Date(m.scheduledDate!).getTime()) / 86400000)
+                    return (
+                      <Link key={m.id} href={`/courses/${m.course.id}`}
+                        className="text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-1 rounded-md hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors truncate max-w-[300px]"
+                        title={`${m.course.title} > ${m.title}`}>
+                        {m.course.icon} {m.title}
+                        <span className="ml-1 font-semibold">逾期{overdueDays}天</span>
+                      </Link>
+                    )
+                  })}
+                  {overdueModules.length > 6 && (
+                    <Link href="/schedule" className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">
+                      +{overdueModules.length - 6} 个
+                    </Link>
+                  )}
+                </div>
+              </div>
+              <Link href="/schedule">
+                <Button variant="outline" size="sm" className="shrink-0 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400">
+                  <Clock className="h-3.5 w-3.5 mr-1" />查看排期
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Today's Schedule */}
       {todaySchedule.length > 0 && (
         <Card>
@@ -234,11 +293,17 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="space-y-2">
               {todaySchedule.map((m) => {
-                const isOverdue = m.status !== "completed"
+                const nowTs = now.getTime()
+                const scheduledTs = m.scheduledDate ? new Date(m.scheduledDate).getTime() : nowTs
+                const overdueDays = m.status !== "completed" ? Math.max(0, Math.ceil((nowTs - scheduledTs) / 86400000)) : 0
+                const isOverdue = overdueDays > 0
                 const isDone = m.status === "completed"
                 return (
-                  <Link key={m.id} href={`/courses/${m.course.id}/learn/${m.id}`}>
-                    <div className={`flex items-center gap-3 rounded-lg border p-3 transition-colors hover:border-primary/50 ${isDone ? "bg-muted/50" : "bg-card"}`}>
+                  <Link key={m.id} href={`/courses/${m.course.id}`}>
+                    <div className={`flex items-center gap-3 rounded-lg border p-3 transition-colors hover:border-primary/50 ${
+                      isOverdue ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800" :
+                      isDone ? "bg-muted/50" : "bg-card"
+                    }`}>
                       <div className={`shrink-0 h-8 w-8 rounded-md flex items-center justify-center text-sm`}
                         style={{ backgroundColor: `${m.course.color}20`, color: m.course.color }}>
                         {m.course.icon}
@@ -249,6 +314,10 @@ export default async function DashboardPage() {
                           {isDone ? (
                             <Badge className="bg-green-500 hover:bg-green-600 text-[10px] shrink-0">
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />已完成
+                            </Badge>
+                          ) : isOverdue ? (
+                            <Badge className="bg-red-500 hover:bg-red-600 text-[10px] shrink-0">
+                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />逾期{overdueDays}天
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-[10px] shrink-0">待完成</Badge>
@@ -374,6 +443,71 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Weekly Report */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            本周学习周报
+          </CardTitle>
+          <Badge variant="outline" className="text-xs">
+            {startOfWeek.getMonth() + 1}/{startOfWeek.getDate()} - {endOfWeek.getMonth() + 1}/{endOfWeek.getDate() - 1}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Completed this week */}
+            <div className="rounded-lg border p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-sm font-medium">本周已完成</span>
+                <Badge className="bg-green-500 text-[10px]">{weeklyCompletedKps.length}</Badge>
+              </div>
+              {weeklyCompletedKps.length > 0 ? (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {weeklyCompletedKps.slice(0, 10).map((kp) => (
+                    <div key={kp.id} className="flex items-center gap-2 text-xs">
+                      <span>{kp.module.course.icon}</span>
+                      <span className="text-muted-foreground truncate">{kp.title}</span>
+                      <span className="text-muted-foreground/50 shrink-0">
+                        {kp.completedAt ? new Date(kp.completedAt).toLocaleDateString("zh-CN", { weekday: "short" }) : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">本周暂无完成记录，加油！</p>
+              )}
+            </div>
+            {/* Overdue this week */}
+            <div className="rounded-lg border p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                <span className="text-sm font-medium">逾期未完成</span>
+                <Badge className="bg-red-500 text-[10px]">{overdueModules.length}</Badge>
+              </div>
+              {overdueModules.length > 0 ? (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {overdueModules.slice(0, 10).map((m) => {
+                    const d = Math.ceil((now.getTime() - new Date(m.scheduledDate!).getTime()) / 86400000)
+                    return (
+                      <Link key={m.id} href={`/courses/${m.course.id}`}
+                        className="flex items-center gap-2 text-xs hover:bg-muted rounded px-1 py-0.5 transition-colors">
+                        <span>{m.course.icon}</span>
+                        <span className="truncate flex-1">{m.title}</span>
+                        <span className="text-red-500 font-medium shrink-0">逾期{d}天</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">暂无逾期模块，继续保持！</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

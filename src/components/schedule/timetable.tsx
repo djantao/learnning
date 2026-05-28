@@ -215,15 +215,22 @@ export function Timetable() {
                       <span>{dayCompleted}/{dayModules.length} 完成</span>
                       <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{formatMinutes(dayTotal)}</span>
                     </div>
-                    {dayModules.map((m) => (
+                    {dayModules.map((m) => {
+                      const oDays = calcOverdueDays(m)
+                      const isOverdue = oDays > 0
+                      const isDone = m.status === "completed"
+                      return (
                       <Link key={m.id} href={`/courses/${m.course.id}`}>
-                        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${m.status === "completed" ? "opacity-60" : ""}`}>
+                        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${
+                          isOverdue ? "border-red-400 dark:border-red-600 bg-red-50/50 dark:bg-red-950/20" :
+                          isDone ? "opacity-60 border-green-300 dark:border-green-800" : ""
+                        }`}>
                           <CardContent className="py-2 px-2.5 space-y-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs">{m.course.icon}</span>
-                              <span className="text-[11px] font-medium truncate">{m.course.title}</span>
+                              <span className="text-[11px] font-medium truncate" title={m.course.title}>{m.course.title}</span>
                             </div>
-                            <p className="text-xs truncate text-muted-foreground">{m.title}</p>
+                            <p className="text-xs truncate text-muted-foreground" title={m.title}>{m.title}</p>
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] text-muted-foreground">
                                 {m.estimatedMinutes ? formatMinutes(m.estimatedMinutes) : ""}
@@ -236,7 +243,7 @@ export function Timetable() {
                           </CardContent>
                         </Card>
                       </Link>
-                    ))}
+                    )})}
                   </>
                 )}
               </div>

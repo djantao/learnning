@@ -165,7 +165,7 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
                 ) : (
                   <span className="w-4" />
                 )}
-                <CardTitle className="text-sm font-medium truncate">{mod.title}</CardTitle>
+                <CardTitle className="text-sm font-medium truncate" title={mod.title}>{mod.title}</CardTitle>
                 <Badge variant="outline" className="text-[10px]">{statusLabel(mod.status)}</Badge>
                 {(() => {
                   const total = totalModuleMinutes(mod)
@@ -227,7 +227,7 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
               <CardContent className="flex items-center justify-between py-2.5 px-4">
                 <div className="flex items-center gap-2 min-w-0">
                   <Play className="h-3 w-3 shrink-0 text-primary" />
-                  <span className="text-sm truncate">{kp.title}</span>
+                  <span className="text-sm truncate" title={kp.title}>{kp.title}</span>
                 </div>
                 {(() => {
                   const m = masteryLabel(kp.mastery)
