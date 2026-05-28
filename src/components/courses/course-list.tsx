@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { GraduationCap, Plus, BookOpen, Sparkles, Loader2, Trash2 } from "lucide-react"
+import { GraduationCap, Plus, BookOpen, Sparkles, Loader2, Trash2, Search, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
 
@@ -16,16 +17,32 @@ interface Course {
   _count?: { modules: number }
 }
 
+interface BookChapter {
+  title: string
+  description: string
+  subChapters: string[]
+}
+
+interface BookOutline {
+  courseTitle: string
+  bookTitle: string
+  chapters: BookChapter[]
+}
+
 export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
   const [courses, setCourses] = useState(initialCourses)
   const [newTitle, setNewTitle] = useState("")
   const [newDesc, setNewDesc] = useState("")
   const [open, setOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
-  const [aiMode, setAiMode] = useState<"outline" | "topic">("outline")
+  const [aiMode, setAiMode] = useState<"outline" | "topic" | "book">("outline")
   const [aiText, setAiText] = useState("")
   const [aiTopicName, setAiTopicName] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
+  const [bookTitle, setBookTitle] = useState("")
+  const [bookOutline, setBookOutline] = useState<BookOutline | null>(null)
+  const [bookLoading, setBookLoading] = useState(false)
+  const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set())
 
   async function createCourse() {
     if (!newTitle.trim()) return
@@ -57,10 +74,69 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
     }
   }
 
+  async function searchBookOutline() {
+    if (!bookTitle.trim() || bookTitle.trim().length < 2) {
+      toast.error("请输入书名（至少2个字符）")
+      return
+    }
+    setBookLoading(true)
+    setBookOutline(null)
+    setSelectedChapters(new Set())
+    try {
+      const res = await fetch("/api/ai/generate-book-outline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookTitle: bookTitle.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok && data.chapters) {
+        setBookOutline(data)
+        setSelectedChapters(new Set(data.chapters.map((_: BookChapter, i: number) => i)))
+        toast.success(`已获取「${data.bookTitle}」的大纲`)
+      } else {
+        toast.error(data.error || "获取大纲失败")
+      }
+    } catch {
+      toast.error("网络错误")
+    }
+    setBookLoading(false)
+  }
+
+  function toggleChapter(idx: number) {
+    const next = new Set(selectedChapters)
+    if (next.has(idx)) next.delete(idx)
+    else next.add(idx)
+    setSelectedChapters(next)
+  }
+
+  function toggleAll() {
+    if (!bookOutline) return
+    if (selectedChapters.size === bookOutline.chapters.length) {
+      setSelectedChapters(new Set())
+    } else {
+      setSelectedChapters(new Set(bookOutline.chapters.map((_, i) => i)))
+    }
+  }
+
+  function buildBookOutlineText(): string {
+    if (!bookOutline) return ""
+    const selected = bookOutline.chapters.filter((_, i) => selectedChapters.has(i))
+    return `# ${bookOutline.courseTitle}\n\n基于《${bookOutline.bookTitle}》\n\n` +
+      selected.map((ch) =>
+        `## ${ch.title}\n${ch.description}\n` +
+        ch.subChapters.map((sc) => `- ${sc}`).join("\n")
+      ).join("\n\n")
+  }
+
   async function aiGenerate() {
     if (aiMode === "topic") {
       if (!aiTopicName.trim() || aiTopicName.trim().length < 2) {
         toast.error("请输入至少 2 个字符的课程主题")
+        return
+      }
+    } else if (aiMode === "book") {
+      if (!bookOutline || selectedChapters.size === 0) {
+        toast.error("请先搜索书籍大纲并选择至少一个章节")
         return
       }
     } else {
@@ -73,7 +149,9 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
     try {
       const body = aiMode === "topic"
         ? { mode: "topic", topicName: aiTopicName.trim() }
-        : { rawText: aiText }
+        : aiMode === "book"
+          ? { rawText: buildBookOutlineText() }
+          : { rawText: aiText }
       const res = await fetch("/api/ai/generate-course", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,6 +162,9 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
         setCourses([data.course, ...courses])
         setAiText("")
         setAiTopicName("")
+        setBookTitle("")
+        setBookOutline(null)
+        setSelectedChapters(new Set())
         setAiOpen(false)
         toast.success(`课程「${data.course.title}」已生成`)
       } else {
@@ -96,6 +177,12 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
     }
   }
 
+  function resetBookState() {
+    setBookTitle("")
+    setBookOutline(null)
+    setSelectedChapters(new Set())
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -104,7 +191,7 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
           <p className="text-muted-foreground">AI 教练驱动的体系化学习</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setAiOpen(true)}>
+          <Button variant="outline" onClick={() => { setAiOpen(true); resetBookState() }}>
             <Sparkles className="mr-2 h-4 w-4" />
             AI 生成
           </Button>
@@ -113,6 +200,7 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
             新建课程
           </Button>
         </div>
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
@@ -142,7 +230,7 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={aiOpen} onOpenChange={setAiOpen}>
+        <Dialog open={aiOpen} onOpenChange={(v) => { setAiOpen(v); if (!v) resetBookState() }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -150,15 +238,17 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
                 AI 生成课程
               </DialogTitle>
               <DialogDescription>
-                粘贴结构化大纲让 AI 解析，或直接输入主题名让 AI 从零构建体系化课程。
+                粘贴大纲让 AI 解析、输入主题让 AI 构建、或搜索书籍自动生成体系化课程。
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              <Tabs value={aiMode} onValueChange={(v) => setAiMode(v as "outline" | "topic")}>
+              <Tabs value={aiMode} onValueChange={(v) => { setAiMode(v as typeof aiMode); resetBookState() }}>
                 <TabsList variant="line" className="w-full">
                   <TabsTrigger value="outline" className="flex-1">📋 粘贴大纲</TabsTrigger>
                   <TabsTrigger value="topic" className="flex-1">💡 输入主题</TabsTrigger>
+                  <TabsTrigger value="book" className="flex-1">📖 从书籍</TabsTrigger>
                 </TabsList>
+
                 <TabsContent value="outline" className="pt-4">
                   <Textarea
                     className="min-h-[200px] max-h-[360px] font-mono text-sm"
@@ -173,6 +263,7 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
                     onChange={(e) => setAiText(e.target.value)}
                   />
                 </TabsContent>
+
                 <TabsContent value="topic" className="pt-4 space-y-3">
                   <p className="text-sm text-muted-foreground">输入你想学习的主题，AI 将自动构建完整的知识体系，覆盖从入门到进阶。</p>
                   <Input
@@ -182,17 +273,84 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
                     onKeyDown={(e) => e.key === "Enter" && aiGenerate()}
                   />
                 </TabsContent>
+
+                <TabsContent value="book" className="pt-4 space-y-4">
+                  <p className="text-sm text-muted-foreground">输入你想学习的书名，AI 将搜索该书的大纲并生成课程。</p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="例如：数据密集型应用系统设计、深入理解计算机系统..."
+                      value={bookTitle}
+                      onChange={(e) => setBookTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && searchBookOutline()}
+                      className="flex-1"
+                    />
+                    <Button variant="outline" onClick={searchBookOutline} disabled={bookLoading}>
+                      {bookLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      搜索大纲
+                    </Button>
+                  </div>
+
+                  {bookOutline && (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-muted/50 border-b">
+                        <div>
+                          <p className="text-sm font-semibold">{bookOutline.courseTitle}</p>
+                          <p className="text-xs text-muted-foreground">基于《{bookOutline.bookTitle}》· {bookOutline.chapters.length} 章</p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="text-xs" onClick={toggleAll}>
+                          {selectedChapters.size === bookOutline.chapters.length ? "取消全选" : "全选"}
+                        </Button>
+                      </div>
+                      <div className="max-h-[320px] overflow-y-auto divide-y">
+                        {bookOutline.chapters.map((ch, i) => (
+                          <label
+                            key={i}
+                            className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors ${
+                              selectedChapters.has(i) ? "bg-primary/5" : "opacity-60"
+                            }`}
+                          >
+                            <Checkbox
+                              checked={selectedChapters.has(i)}
+                              onCheckedChange={() => toggleChapter(i)}
+                              className="mt-0.5"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                {selectedChapters.has(i) && <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />}
+                                <p className="text-sm font-medium">{ch.title}</p>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">{ch.description}</p>
+                              {ch.subChapters.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {ch.subChapters.map((sc, j) => (
+                                    <span key={j} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                      {sc}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="px-4 py-2 bg-muted/30 border-t text-xs text-muted-foreground">
+                        已选 {selectedChapters.size}/{bookOutline.chapters.length} 章
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
               </Tabs>
-              <Button onClick={aiGenerate} className="w-full" disabled={aiLoading}>
+
+              <Button onClick={aiGenerate} className="w-full" disabled={aiLoading || (aiMode === "book" && (!bookOutline || selectedChapters.size === 0))}>
                 {aiLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {aiMode === "topic" ? "AI 正在构建知识体系..." : "AI 正在解析大纲..."}
+                    {aiMode === "topic" ? "AI 正在构建知识体系..." : aiMode === "book" ? "AI 正在生成课程..." : "AI 正在解析大纲..."}
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    {aiMode === "topic" ? "生成体系化课程" : "开始生成"}
+                    {aiMode === "topic" ? "生成体系化课程" : aiMode === "book" ? `生成课程（${selectedChapters.size}章）` : "开始生成"}
                   </>
                 )}
               </Button>
