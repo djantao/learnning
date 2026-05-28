@@ -9,9 +9,11 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const days = parseInt(url.searchParams.get("days") || "14", 10)
 
-  const rebalance = await rebalanceSchedule(session.user.id)
-
-  const modules = await getUpcomingModules(session.user.id, Math.min(days, 60))
+  // 并行执行：重排期和获取模块同时进行，不互相阻塞
+  const [rebalance, modules] = await Promise.all([
+    rebalanceSchedule(session.user.id),
+    getUpcomingModules(session.user.id, Math.min(days, 60)),
+  ])
 
   const grouped: Record<string, typeof modules> = {}
   for (const m of modules) {

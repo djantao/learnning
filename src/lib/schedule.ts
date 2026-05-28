@@ -233,9 +233,12 @@ export async function rebalanceSchedule(userId: string) {
       scheduledDate: m.scheduledDate!,
       overdueDays,
     })
+  }
 
-    await prisma.module.update({
-      where: { id: m.id },
+  // 批量更新所有逾期模块，避免 N 次串行 DB 写入
+  if (details.length > 0) {
+    await prisma.module.updateMany({
+      where: { id: { in: details.map((d) => d.moduleId) } },
       data: { scheduledDate: new Date(tomorrow) },
     })
   }

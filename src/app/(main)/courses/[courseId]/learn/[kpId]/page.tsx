@@ -19,16 +19,17 @@ export default async function LearnPage({
   })
   if (!kp) notFound()
 
-  const course = await prisma.course.findFirst({
-    where: { id: kp.module.courseId, userId: session.user.id },
-  })
+  const [course, siblings] = await Promise.all([
+    prisma.course.findFirst({
+      where: { id: kp.module.courseId, userId: session.user.id },
+    }),
+    prisma.knowledgePoint.findMany({
+      where: { moduleId: kp.moduleId },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, title: true, sortOrder: true },
+    }),
+  ])
   if (!course) notFound()
-
-  const siblings = await prisma.knowledgePoint.findMany({
-    where: { moduleId: kp.moduleId },
-    orderBy: { sortOrder: "asc" },
-    select: { id: true, title: true, sortOrder: true },
-  })
   const idx = siblings.findIndex((s) => s.id === kpId)
 
   const kpData = {

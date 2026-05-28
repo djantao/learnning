@@ -14,8 +14,8 @@ export default async function DashboardPage() {
   const userId = session.user.id
   const userName = session.user.name ?? session.user.email ?? "同学"
 
-  // 自动把逾期未完成的模块推到明天
-  await rebalanceSchedule(userId)
+  // 后台执行逾期重新排期，不阻塞页面加载
+  rebalanceSchedule(userId).catch(() => {})
 
   // Real data queries - run in parallel
   // 逾期模块：排期在今天之前但未完成
