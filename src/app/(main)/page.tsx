@@ -6,6 +6,9 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Brain, BookOpen, MessageSquare, TrendingUp, Target, AlertTriangle, Star, GraduationCap, Clock, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react"
 import { getTodayModules, rebalanceSchedule } from "@/lib/schedule"
+import { ResumeButton } from "@/components/courses/resume-button"
+import { StreakCalendar } from "@/components/dashboard/streak-calendar"
+import { DailyChecklist } from "@/components/dashboard/daily-checklist"
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -40,6 +43,7 @@ export default async function DashboardPage() {
     todaySchedule,
     overdueModules,
     weeklyCompletedKps,
+    resumeUser,
   ] = await Promise.all([
     prisma.flashcard.count({ where: { userId, isSuspended: false, sm2NextReview: { lte: new Date() } } }),
     prisma.flashcard.count({ where: { userId, isSuspended: false } }),
@@ -66,7 +70,32 @@ export default async function DashboardPage() {
       include: { module: { include: { course: { select: { id: true, title: true, icon: true, color: true } } } } },
       orderBy: { completedAt: "desc" },
     }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { resumeCourseId: true, resumeKpId: true, resumeUpdatedAt: true },
+    }),
   ])
+
+  // Fetch resume position details if available
+  let resumePosition: { courseId: string; courseTitle: string; courseIcon: string; courseColor: string; kpId: string; kpTitle: string; moduleId: string; updatedAt: string } | null = null
+  if (resumeUser?.resumeCourseId && resumeUser?.resumeKpId) {
+    const [resumeCourse, resumeKp] = await Promise.all([
+      prisma.course.findUnique({ where: { id: resumeUser.resumeCourseId }, select: { id: true, title: true, icon: true, color: true } }),
+      prisma.knowledgePoint.findUnique({ where: { id: resumeUser.resumeKpId }, select: { id: true, title: true, moduleId: true } }),
+    ])
+    if (resumeCourse && resumeKp) {
+      resumePosition = {
+        courseId: resumeCourse.id,
+        courseTitle: resumeCourse.title,
+        courseIcon: resumeCourse.icon,
+        courseColor: resumeCourse.color,
+        kpId: resumeKp.id,
+        kpTitle: resumeKp.title,
+        moduleId: resumeKp.moduleId,
+        updatedAt: resumeUser.resumeUpdatedAt?.toISOString() ?? "",
+      }
+    }
+  }
 
   const cardsDue = dueCardsCount
   const cardsTotal = totalCardsCount
@@ -131,8 +160,27 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Continue Learning Card */}
-      {lastStudiedKp ? (
+      {/* Continue Learning Card — prefer resume position */}
+      {resumePosition ? (
+        <Card className="bg-gradient-to-r from-violet-500/5 to-purple-500/10 border-violet-500/20 hover:shadow-md transition-shadow">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BookOpen className="h-4 w-4 text-violet-500" />
+              <p className="text-sm font-medium text-violet-600 dark:text-violet-400">继续学习</p>
+            </div>
+            <ResumeButton
+              courseId={resumePosition.courseId}
+              courseTitle={resumePosition.courseTitle}
+              courseIcon={resumePosition.courseIcon}
+              courseColor={resumePosition.courseColor}
+              kpId={resumePosition.kpId}
+              kpTitle={resumePosition.kpTitle}
+              moduleId={resumePosition.moduleId}
+              updatedAt={resumePosition.updatedAt}
+            />
+          </CardContent>
+        </Card>
+      ) : lastStudiedKp ? (
         <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 hover:shadow-md transition-shadow">
           <CardContent className="flex items-center justify-between py-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -237,6 +285,44 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
+      {/* Streak Calendar */}
+      <StreakCalendar />
+
+      {/* Daily Checklist + Stats Row */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <DailyChecklist />
+        </div>
+        <div className="flex flex-col gap-4">
+          {/* Quick actions card */}
+          <div className="rounded-xl border p-4">
+            <h4 className="text-sm font-medium mb-3">快捷操作</h4>
+            <div className="space-y-2">
+              <Link href="/courses">
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                  <BookOpen className="h-4 w-4" />浏览课程
+                </Button>
+              </Link>
+              <Link href="/review/session">
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                  <Brain className="h-4 w-4" />复习卡片
+                </Button>
+              </Link>
+              <Link href="/chat">
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                  <MessageSquare className="h-4 w-4" />AI 对话
+                </Button>
+              </Link>
+              <Link href="/notes/new">
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                  <BookOpen className="h-4 w-4" />写笔记
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Overdue Alert */}
       {overdueModules.length > 0 && (
         <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
@@ -271,70 +357,6 @@ export default async function DashboardPage() {
                   <Clock className="h-3.5 w-3.5 mr-1" />查看排期
                 </Button>
               </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Today's Schedule */}
-      {todaySchedule.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              今日学习
-            </CardTitle>
-            <Link href="/schedule">
-              <Button variant="ghost" size="sm" className="gap-1">
-                完整课表 <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {todaySchedule.map((m) => {
-                const nowTs = now.getTime()
-                const scheduledTs = m.scheduledDate ? new Date(m.scheduledDate).getTime() : nowTs
-                const overdueDays = m.status !== "completed" ? Math.max(0, Math.ceil((nowTs - scheduledTs) / 86400000)) : 0
-                const isOverdue = overdueDays > 0
-                const isDone = m.status === "completed"
-                return (
-                  <Link key={m.id} href={`/courses/${m.course.id}`}>
-                    <div className={`flex items-center gap-3 rounded-lg border p-3 transition-colors hover:border-primary/50 ${
-                      isOverdue ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800" :
-                      isDone ? "bg-muted/50" : "bg-card"
-                    }`}>
-                      <div className={`shrink-0 h-8 w-8 rounded-md flex items-center justify-center text-sm`}
-                        style={{ backgroundColor: `${m.course.color}20`, color: m.course.color }}>
-                        {m.course.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">{m.title}</span>
-                          {isDone ? (
-                            <Badge className="bg-green-500 hover:bg-green-600 text-[10px] shrink-0">
-                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />已完成
-                            </Badge>
-                          ) : isOverdue ? (
-                            <Badge className="bg-red-500 hover:bg-red-600 text-[10px] shrink-0">
-                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />逾期{overdueDays}天
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[10px] shrink-0">待完成</Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {m.course.title}
-                          {m.estimatedMinutes ? ` · ~${m.estimatedMinutes}分钟` : ""}
-                        </p>
-                      </div>
-                      {m.status === "in_progress" && (
-                        <Progress value={m.progressPct} className="h-1.5 w-16 shrink-0" />
-                      )}
-                    </div>
-                  </Link>
-                )
-              })}
             </div>
           </CardContent>
         </Card>

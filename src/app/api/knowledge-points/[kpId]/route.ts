@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { recomputeForKnowledgePoint } from "@/lib/curriculum"
+import { trackActivity } from "@/lib/activity"
 import { NextResponse } from "next/server"
 
 async function verifyOwnership(kpId: string, userId: string) {
@@ -68,6 +69,18 @@ export async function PATCH(
 
   if (body.mastery !== undefined) {
     recomputeForKnowledgePoint(kpId).catch(() => {})
+    if (body.mastery >= 4) {
+      trackActivity(session.user.id, { kpsCompleted: 1, studyMinutes: 5 }).catch(() => {})
+      // Initialize SM-2 for first-time mastery
+      if (!owner.sm2NextReview) {
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        prisma.knowledgePoint.update({
+          where: { id: kpId },
+          data: { sm2NextReview: tomorrow, sm2Interval: 1 },
+        }).catch(() => {})
+      }
+    }
   }
 
   return NextResponse.json(kp)

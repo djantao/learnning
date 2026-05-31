@@ -10,6 +10,7 @@ export async function trackActivity(
     notesEdited?: number
     aiConversations?: number
     studyMinutes?: number
+    kpsCompleted?: number
   },
 ) {
   const today = new Date(new Date().toDateString())
@@ -29,6 +30,7 @@ export async function trackActivity(
         notesEdited: { increment: fields.notesEdited ?? 0 },
         aiConversations: { increment: fields.aiConversations ?? 0 },
         studyMinutes: { increment: fields.studyMinutes ?? 0 },
+        kpsCompleted: { increment: fields.kpsCompleted ?? 0 },
       },
     })
   } else {
@@ -43,6 +45,7 @@ export async function trackActivity(
         notesEdited: fields.notesEdited ?? 0,
         aiConversations: fields.aiConversations ?? 0,
         studyMinutes: fields.studyMinutes ?? 0,
+        kpsCompleted: fields.kpsCompleted ?? 0,
       },
     })
   }

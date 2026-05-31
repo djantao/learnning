@@ -33,6 +33,12 @@ model User {
   blindSpots         BlindSpot[]
   dailyActivities    DailyActivity[]
   courses            Course[]
+  kpReviewLogs       KpReviewLog[]
+
+  // Resume learning
+  resumeCourseId     String?
+  resumeKpId         String?
+  resumeUpdatedAt    DateTime?
 
   // Auth.js fields
   accounts   Account[]
@@ -320,6 +326,24 @@ model ReviewLog {
   flashcard Flashcard     @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
 }
 
+// KP spaced repetition review log
+model KpReviewLog {
+  id                String   @id @default(cuid())
+  userId            String
+  knowledgePointId  String
+  grade             Int      // 0-5 recall quality
+  intervalBefore    Float
+  intervalAfter     Float
+  efactorBefore     Float
+  efactorAfter      Float
+  createdAt         DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgePoint KnowledgePoint @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
 // ============================================================
 // LEARNING PATH TRACKING
 // ============================================================
@@ -393,6 +417,7 @@ model DailyActivity {
   notesEdited     Int      @default(0)
   aiConversations Int      @default(0)
   studyMinutes    Int      @default(0)
+  kpsCompleted    Int      @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -471,6 +496,7 @@ model Module {
   progressPct       Float    @default(0.0)
   estimatedMinutes  Int?     // AI 估算的学习时长（分钟）
   scheduledDate     DateTime? // 排期学习日期
+  checkedAt         DateTime? // 今日清单勾选时间
   createdAt         DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -494,10 +520,18 @@ model KnowledgePoint {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // SM-2 spaced repetition for knowledge points
+  sm2Interval       Float     @default(0)
+  sm2Repetitions    Int       @default(0)
+  sm2Efactor        Float     @default(2.5)
+  sm2NextReview     DateTime?
+  lastReviewedAt    DateTime?
+
   module          Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   flashcards      Flashcard[]
   practiceRecords PracticeRecord[]
   pages           Page[]
+  kpReviewLogs    KpReviewLog[]
 }
 
 model MindMap {

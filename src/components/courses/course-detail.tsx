@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,7 @@ import {
 import type { CourseStats } from "@/lib/course-stats"
 import { masteryLabel } from "@/lib/mastery"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ResumeBanner } from "@/components/courses/resume-button"
 import { toast } from "sonner"
 import Link from "next/link"
 
@@ -72,6 +73,19 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
   const [dailyMinutes, setDailyMinutes] = useState("120")
   const [scheduling, setScheduling] = useState(false)
   const [clearingSchedule, setClearingSchedule] = useState(false)
+  const [resumeKp, setResumeKp] = useState<{ kpId: string; kpTitle: string } | null>(null)
+
+  // Fetch resume position
+  useEffect(() => {
+    fetch("/api/user/resume")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.courseId === course.id) {
+          setResumeKp({ kpId: data.kpId, kpTitle: data.kpTitle })
+        }
+      })
+      .catch(() => {})
+  }, [course.id])
 
   async function clearSchedule() {
     setClearingSchedule(true)
@@ -285,6 +299,11 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
           </Button>
         </div>
       </div>
+
+      {/* Resume banner */}
+      {resumeKp && (
+        <ResumeBanner courseId={course.id} kpId={resumeKp.kpId} kpTitle={resumeKp.kpTitle} />
+      )}
 
       {stats && stats.totalKps > 0 && (
         <Card className="bg-gradient-to-r from-primary/5 to-primary/10">

@@ -46,6 +46,15 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
     setMastery(kp.mastery)
   }, [kp.id])
 
+  // Save resume position on mount
+  useEffect(() => {
+    fetch("/api/user/resume", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ courseId: kp.module.courseId, kpId: kp.id }),
+    }).catch(() => {})
+  }, [kp.id, kp.module.courseId])
+
   async function updateMastery(value: number) {
     const wasMastered = mastery >= 4
     setMastery(value)

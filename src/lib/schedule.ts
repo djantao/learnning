@@ -290,3 +290,88 @@ ${details.map((d) => `<tr><td style="padding:8px;border:1px solid #ddd;">${d.cou
 
   return { moved: details.length, details }
 }
+
+/** 根据目标截止日期计算每日学习需求 */
+export async function getDailyRequirement(goalId: string) {
+  const goal = await prisma.learningGoal.findUnique({
+    where: { id: goalId },
+    include: {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          dailyStudyMinutes: true,
+          modules: {
+            where: { parentModuleId: null },
+            select: {
+              id: true, title: true, estimatedMinutes: true, sortOrder: true,
+              childModules: {
+                select: {
+                  id: true, title: true, estimatedMinutes: true, sortOrder: true,
+                  childModules: {
+                    select: { id: true, title: true, estimatedMinutes: true, sortOrder: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!goal?.targetDate || !goal?.course) {
+    return { dailyKpsNeeded: null, dailyMinutesNeeded: null, feasible: null, totalRemaining: 0, daysLeft: 0 }
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(goal.targetDate)
+  target.setHours(23, 59, 59, 999)
+  const daysLeft = Math.max(1, Math.ceil((target.getTime() - today.getTime()) / 86400000))
+
+  const flat = flattenModules(goal.course.modules)
+  const totalMinutes = flat.reduce((s, m) => s + m.estimatedMinutes, 0)
+
+  const kpCount = await prisma.knowledgePoint.count({
+    where: {
+      module: { courseId: goal.course.id },
+      mastery: { lt: 4 },
+    },
+  })
+
+  const dailyKpsNeeded = Math.ceil(kpCount / daysLeft)
+  const dailyMinutesNeeded = Math.ceil(totalMinutes * ((100 - goal.progressPct) / 100) / daysLeft)
+  const feasible = goal.course.dailyStudyMinutes
+    ? dailyMinutesNeeded <= goal.course.dailyStudyMinutes
+    : dailyMinutesNeeded <= 180
+
+  return { dailyKpsNeeded, dailyMinutesNeeded, feasible, totalRemaining: kpCount, daysLeft }
+}
+
+/** 根据目标截止日期自动排期 */
+export async function scheduleFromGoal(userId: string, goalId: string, targetDate: Date) {
+  const goal = await prisma.learningGoal.findUnique({
+    where: { id: goalId },
+    include: { course: { select: { id: true, title: true } } },
+  })
+
+  if (!goal?.course) {
+    return { success: false, message: "目标未关联课程" }
+  }
+
+  const { dailyMinutesNeeded } = await getDailyRequirement(goalId)
+  if (!dailyMinutesNeeded) {
+    return { success: false, message: "无法计算每日需求" }
+  }
+
+  await prisma.learningGoal.update({
+    where: { id: goalId },
+    data: { targetDate, status: "in_progress" },
+  })
+
+  const dailyMinutes = Math.max(30, Math.ceil(dailyMinutesNeeded / 30) * 30)
+  const result = await scheduleCourse(userId, goal.course.id, dailyMinutes)
+
+  return { success: true, dailyMinutes, ...result }
+}
