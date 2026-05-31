@@ -11,20 +11,26 @@ export async function GET() {
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
+  // 今天排期的 + 逾期未完成的，排除已完成的
   const modules = await prisma.module.findMany({
     where: {
       course: { userId: session.user.id },
-      scheduledDate: { gte: today, lt: tomorrow },
       status: { not: "completed" },
+      scheduledDate: { not: null },
+      OR: [
+        { scheduledDate: { gte: today, lt: tomorrow } },
+        { scheduledDate: { lt: today } },
+      ],
     },
     include: {
       course: { select: { id: true, title: true, icon: true, color: true } },
     },
-    orderBy: { sortOrder: "asc" },
+    orderBy: [{ scheduledDate: "asc" }, { sortOrder: "asc" }],
   })
 
   const items = modules.map((m) => {
     const isChecked = m.checkedAt != null && new Date(m.checkedAt) >= today
+    const isOverdue = m.scheduledDate != null && new Date(m.scheduledDate) < today
     return {
       moduleId: m.id,
       title: m.title,
@@ -35,7 +41,9 @@ export async function GET() {
       estimatedMinutes: m.estimatedMinutes,
       status: m.status,
       progressPct: m.progressPct,
+      scheduledDate: m.scheduledDate,
       checked: isChecked,
+      isOverdue,
     }
   })
 

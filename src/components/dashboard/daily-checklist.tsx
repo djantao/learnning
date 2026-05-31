@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Play, CheckCircle2 } from "lucide-react"
+import { Clock, Play, CheckCircle2, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 
 interface ChecklistItem {
@@ -18,7 +18,9 @@ interface ChecklistItem {
   estimatedMinutes: number | null
   status: string
   progressPct: number
+  scheduledDate: string | null
   checked: boolean
+  isOverdue: boolean
 }
 
 function formatMinutes(m: number): string {
@@ -73,8 +75,8 @@ export function DailyChecklist() {
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed p-6 text-center">
-        <Clock className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-        <p className="mt-2 text-sm text-muted-foreground">今日暂无学习安排</p>
+        <CheckCircle2 className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+        <p className="mt-2 text-sm text-muted-foreground">没有待学习的模块</p>
         <Link href="/courses">
           <Button variant="outline" size="sm" className="mt-2">去排课</Button>
         </Link>
@@ -83,26 +85,41 @@ export function DailyChecklist() {
   }
 
   const checkedCount = items.filter((i) => i.checked).length
+  const overdueCount = items.filter((i) => i.isOverdue && !i.checked).length
+  const todayCount = items.filter((i) => !i.isOverdue).length
   const totalMinutes = items.reduce((s, i) => s + (i.estimatedMinutes ?? 0), 0)
 
   return (
     <div className="rounded-xl border p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-medium">今日学习清单</h4>
-        <Badge variant="secondary" className="text-[10px]">
-          {checkedCount}/{items.length} 已完成
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          {overdueCount > 0 && (
+            <Badge className="bg-red-500 text-[10px]">
+              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />{overdueCount} 逾期
+            </Badge>
+          )}
+          <Badge variant="secondary" className="text-[10px]">
+            {checkedCount}/{items.length}
+          </Badge>
+        </div>
       </div>
 
       <Progress value={items.length > 0 ? (checkedCount / items.length) * 100 : 0} className="h-1.5 mb-3" />
 
       <div className="space-y-1.5">
-        {items.map((item) => (
+        {items.map((item) => {
+          const overdueDays = item.isOverdue && item.scheduledDate
+            ? Math.ceil((Date.now() - new Date(item.scheduledDate).getTime()) / 86400000)
+            : 0
+          return (
           <div
             key={item.moduleId}
             className={`flex items-center gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted/50 ${
-              item.checked ? "opacity-60" : ""
-            }`}
+              item.isOverdue && !item.checked
+                ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800"
+                : ""
+            } ${item.checked ? "opacity-60" : ""}`}
           >
             <Checkbox
               checked={item.checked}
@@ -116,9 +133,14 @@ export function DailyChecklist() {
               {item.courseIcon}
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm truncate ${item.checked ? "line-through text-muted-foreground" : "font-medium"}`}>
-                {item.title}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className={`text-sm truncate ${item.checked ? "line-through text-muted-foreground" : "font-medium"}`}>
+                  {item.title}
+                </p>
+                {item.isOverdue && !item.checked && (
+                  <Badge className="bg-red-500 text-[10px] shrink-0">逾期{overdueDays}天</Badge>
+                )}
+              </div>
               <p className="text-[11px] text-muted-foreground truncate">
                 {item.courseTitle}
                 {item.estimatedMinutes && (
@@ -137,7 +159,7 @@ export function DailyChecklist() {
               </Link>
             )}
           </div>
-        ))}
+        )})}
       </div>
 
       {totalMinutes > 0 && (
