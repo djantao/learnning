@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/db"
 import { getUpcomingModules, rebalanceSchedule } from "@/lib/schedule"
 import { NextResponse } from "next/server"
 
@@ -9,11 +10,37 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const days = parseInt(url.searchParams.get("days") || "14", 10)
 
-  // 并行执行：重排期和获取模块同时进行，不互相阻塞
-  const [rebalance, modules] = await Promise.all([
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const pastStart = new Date(today)
+  pastStart.setDate(pastStart.getDate() - 30)
+
+  // 并行：重排期 + 未来模块 + 过去逾期/已完成模块
+  const [rebalance, upcoming, pastModules] = await Promise.all([
     rebalanceSchedule(session.user.id),
     getUpcomingModules(session.user.id, Math.min(days, 60)),
+    prisma.module.findMany({
+      where: {
+        course: { userId: session.user.id },
+        scheduledDate: { gte: pastStart, lt: today },
+      },
+      select: {
+        id: true, title: true, status: true, progressPct: true,
+        estimatedMinutes: true, scheduledDate: true, sortOrder: true,
+        course: { select: { id: true, title: true, icon: true, color: true } },
+        parentModule: { select: { id: true, title: true } },
+      },
+      orderBy: [{ scheduledDate: "asc" }, { sortOrder: "asc" }],
+    }),
   ])
+
+  // 合并去重
+  const seen = new Set<string>()
+  const modules = [...pastModules, ...upcoming].filter((m) => {
+    if (seen.has(m.id)) return false
+    seen.add(m.id)
+    return true
+  }).sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime())
 
   const grouped: Record<string, typeof modules> = {}
   for (const m of modules) {
