@@ -15,24 +15,22 @@ export async function GET(req: Request) {
   const pastStart = new Date(today)
   pastStart.setDate(pastStart.getDate() - 30)
 
-  // 并行：重排期 + 未来模块 + 过去逾期/已完成模块
-  const [rebalance, upcoming, pastModules] = await Promise.all([
-    rebalanceSchedule(session.user.id),
-    getUpcomingModules(session.user.id, Math.min(days, 60)),
-    prisma.module.findMany({
-      where: {
-        course: { userId: session.user.id },
-        scheduledDate: { gte: pastStart, lt: today },
-      },
-      select: {
-        id: true, title: true, status: true, progressPct: true,
-        estimatedMinutes: true, scheduledDate: true, sortOrder: true,
-        course: { select: { id: true, title: true, icon: true, color: true } },
-        parentModule: { select: { id: true, title: true } },
-      },
-      orderBy: [{ scheduledDate: "asc" }, { sortOrder: "asc" }],
-    }),
-  ])
+  // 串行执行避免 Neon 事务冲突
+  const rebalance = await rebalanceSchedule(session.user.id)
+  const upcoming = await getUpcomingModules(session.user.id, Math.min(days, 60))
+  const pastModules = await prisma.module.findMany({
+    where: {
+      course: { userId: session.user.id },
+      scheduledDate: { gte: pastStart, lt: today },
+    },
+    select: {
+      id: true, title: true, status: true, progressPct: true,
+      estimatedMinutes: true, scheduledDate: true, sortOrder: true,
+      course: { select: { id: true, title: true, icon: true, color: true } },
+      parentModule: { select: { id: true, title: true } },
+    },
+    orderBy: [{ scheduledDate: "asc" }, { sortOrder: "asc" }],
+  })
 
   // 合并去重
   const seen = new Set<string>()
