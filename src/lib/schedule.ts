@@ -5,6 +5,33 @@ interface FlatModule {
   id: string
   title: string
   estimatedMinutes: number
+  status?: string
+}
+
+/** 解析 weeklySchedule JSON，返回日容量映射。0=周日, 6=周六 */
+function parseWeeklySchedule(raw: string | null | undefined): Record<number, number> | undefined {
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw)
+    const map: Record<number, number> = {}
+    for (const [k, v] of Object.entries(parsed)) {
+      const day = parseInt(k)
+      if (day >= 0 && day <= 6 && typeof v === "number") {
+        map[day] = v
+      }
+    }
+    return Object.keys(map).length > 0 ? map : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** 获取某天的容量：优先用 weeklySchedule 中该日的值，0=休息日 */
+function getDayCapacity(date: Date, defaultMinutes: number, weeklySchedule?: Record<number, number>): number {
+  if (!weeklySchedule) return defaultMinutes
+  const v = weeklySchedule[date.getDay()]
+  if (v === undefined) return defaultMinutes
+  return v
 }
 
 interface ScheduleAssignment {
@@ -35,13 +62,14 @@ export function flattenModules(modules: {
   id: string
   title: string
   estimatedMinutes: number | null
+  status?: string
   childModules?: any[]
   sortOrder: number
 }[]): FlatModule[] {
   const result: FlatModule[] = []
   for (const mod of modules) {
     if ((mod.estimatedMinutes ?? 0) > 0) {
-      result.push({ id: mod.id, title: mod.title, estimatedMinutes: mod.estimatedMinutes! })
+      result.push({ id: mod.id, title: mod.title, estimatedMinutes: mod.estimatedMinutes!, status: mod.status })
     }
     if (mod.childModules?.length) {
       result.push(...flattenModules(mod.childModules))
@@ -53,23 +81,36 @@ export function flattenModules(modules: {
 /**
  * 分配日期 — 考虑其他课程已占用的日期容量。
  * existingOccupancy: dateStr → 该日已被其他课程占用的分钟数
- * dailyMinutes: 用户每日总学习时长上限
+ * dailyMinutes: 用户每日总学习时长上限（当 weeklySchedule 未提供时使用）
+ * weeklySchedule: 0=周日~6=周六 的日容量（分钟），0=休息日跳过。未指定时均匀分配
  */
 export function assignDates(
   flatModules: FlatModule[],
   dailyMinutes: number,
   startDate: Date,
-  existingOccupancy: Map<string, number> = new Map()
+  existingOccupancy: Map<string, number> = new Map(),
+  weeklySchedule?: Record<number, number>
 ): ScheduleAssignment[] {
   const assignments: ScheduleAssignment[] = []
   let currentDate = new Date(startDate)
   let accumulated = existingOccupancy.get(fmtDate(currentDate)) ?? 0
 
   for (const mod of flatModules) {
-    // 当前日期容量不够 → 往后顺移
-    while (accumulated + mod.estimatedMinutes > dailyMinutes) {
-      currentDate = addDays(currentDate, 1)
-      accumulated = existingOccupancy.get(fmtDate(currentDate)) ?? 0
+    // 找下一个可用日期：容量够 + 非休息日
+    while (true) {
+      const cap = getDayCapacity(currentDate, dailyMinutes, weeklySchedule)
+      if (cap === 0) {
+        // 休息日，整日跳过
+        currentDate = addDays(currentDate, 1)
+        accumulated = existingOccupancy.get(fmtDate(currentDate)) ?? 0
+        continue
+      }
+      if (accumulated + mod.estimatedMinutes > cap) {
+        currentDate = addDays(currentDate, 1)
+        accumulated = existingOccupancy.get(fmtDate(currentDate)) ?? 0
+        continue
+      }
+      break
     }
 
     assignments.push({
@@ -82,22 +123,33 @@ export function assignDates(
   return assignments
 }
 
-/** 完整排期流程：读取已有排期 → 计算每日余量 → 插入新模块 → 批量更新 */
+/** 完整排期流程：读取已有排期 → 计算每日余量 → 插入新模块 → 批量更新
+ * @param skipCompleted 为 true 时已完成模块保留原排期，仅重排未完成模块（用于自适应调整）
+ */
 export async function scheduleCourse(
   userId: string,
   courseId: string,
   dailyMinutes: number,
-  startDate?: Date
+  startDate?: Date,
+  skipCompleted = false
 ) {
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    select: { weeklySchedule: true },
+  })
+  const weeklySchedule = parseWeeklySchedule(course?.weeklySchedule)
+
+  const statusFilter = skipCompleted ? { not: "completed" } : undefined
+
   const modules = await prisma.module.findMany({
-    where: { courseId, parentModuleId: null },
+    where: { courseId, parentModuleId: null, ...(statusFilter ? { status: statusFilter } : {}) },
     select: {
-      id: true, title: true, estimatedMinutes: true, sortOrder: true,
+      id: true, title: true, estimatedMinutes: true, sortOrder: true, status: true,
       childModules: {
         select: {
-          id: true, title: true, estimatedMinutes: true, sortOrder: true,
+          id: true, title: true, estimatedMinutes: true, sortOrder: true, status: true,
           childModules: {
-            select: { id: true, title: true, estimatedMinutes: true, sortOrder: true },
+            select: { id: true, title: true, estimatedMinutes: true, sortOrder: true, status: true },
           },
         },
       },
@@ -107,7 +159,7 @@ export async function scheduleCourse(
 
   const flat = flattenModules(modules)
   if (flat.length === 0) {
-    return { scheduled: 0, message: "没有含预估时长的模块，请先估算学习时长" }
+    return { scheduled: 0, message: skipCompleted ? "所有模块均已完成" : "没有含预估时长的模块，请先估算学习时长" }
   }
 
   // 查询该用户其他课程已排期的模块，构建每日占用表
@@ -127,14 +179,30 @@ export async function scheduleCourse(
     occupancyMap.set(key, (occupancyMap.get(key) ?? 0) + (m.estimatedMinutes ?? 0))
   }
 
-  const start = startDate ?? new Date()
-  // 确保 startDate 不会落在已被占满的日期
-  let actualStart = new Date(start)
-  while ((occupancyMap.get(fmtDate(actualStart)) ?? 0) >= dailyMinutes) {
-    actualStart = addDays(actualStart, 1)
+  // skipCompleted：将本课程已完成模块的占位加入 occupancyMap
+  if (skipCompleted) {
+    const completedInCourse = await prisma.module.findMany({
+      where: { courseId, status: "completed", scheduledDate: { not: null } },
+      select: { estimatedMinutes: true, scheduledDate: true },
+    })
+    for (const m of completedInCourse) {
+      if (!m.scheduledDate) continue
+      const key = fmtDate(m.scheduledDate)
+      occupancyMap.set(key, (occupancyMap.get(key) ?? 0) + (m.estimatedMinutes ?? 0))
+    }
   }
 
-  const assignments = assignDates(flat, dailyMinutes, actualStart, occupancyMap)
+  const start = startDate ?? new Date()
+  // 确保 startDate 不会落在已被占满的日期（考虑弹性节奏下的日容量）
+  let actualStart = new Date(start)
+  while (true) {
+    const cap = getDayCapacity(actualStart, dailyMinutes, weeklySchedule)
+    if (cap === 0) { actualStart = addDays(actualStart, 1); continue }
+    if ((occupancyMap.get(fmtDate(actualStart)) ?? 0) >= cap) { actualStart = addDays(actualStart, 1); continue }
+    break
+  }
+
+  const assignments = assignDates(flat, dailyMinutes, actualStart, occupancyMap, weeklySchedule)
 
   await Promise.all(
     assignments.map((a) =>

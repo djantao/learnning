@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { scheduleCourse } from "@/lib/schedule"
+import { adaptSchedule } from "@/lib/adaptive-schedule"
 import { NextResponse } from "next/server"
 
 export async function POST(
@@ -11,11 +12,7 @@ export async function POST(
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { courseId } = await params
-  const { dailyStudyMinutes } = await req.json()
-
-  if (!dailyStudyMinutes || dailyStudyMinutes < 10) {
-    return NextResponse.json({ error: "每日学习时长至少10分钟" }, { status: 400 })
-  }
+  const { dailyStudyMinutes, weeklySchedule, adaptive, skipCompleted } = await req.json()
 
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId: session.user.id },
@@ -23,7 +20,26 @@ export async function POST(
   if (!course) return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
 
   try {
-    const result = await scheduleCourse(session.user.id, courseId, dailyStudyMinutes)
+    // 自适应排期模式：检测偏差 → 自动重排
+    if (adaptive) {
+      const result = await adaptSchedule(session.user.id, courseId)
+      return NextResponse.json(result)
+    }
+
+    // 保存弹性节奏配置（如果提供）
+    if (weeklySchedule) {
+      await prisma.course.update({
+        where: { id: courseId },
+        data: { weeklySchedule },
+      })
+    }
+
+    const mins = dailyStudyMinutes ?? course.dailyStudyMinutes ?? 120
+    if (mins < 10) {
+      return NextResponse.json({ error: "每日学习时长至少10分钟" }, { status: 400 })
+    }
+
+    const result = await scheduleCourse(session.user.id, courseId, mins, undefined, !!skipCompleted)
     return NextResponse.json(result)
   } catch (error: any) {
     console.error("schedule error:", error)

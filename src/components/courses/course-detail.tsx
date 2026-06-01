@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import {
-  ChevronRight, ChevronDown, Plus, GraduationCap, Play, Pencil, Loader2, Clock, Target, CalendarClock, ClipboardCheck,
+  ChevronRight, ChevronDown, Plus, GraduationCap, Play, Pencil, Loader2, Clock, Target, CalendarClock, ClipboardCheck, Settings2,
 } from "lucide-react"
 import type { CourseStats } from "@/lib/course-stats"
 import { masteryLabel } from "@/lib/mastery"
@@ -74,6 +74,9 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
   const [scheduling, setScheduling] = useState(false)
   const [clearingSchedule, setClearingSchedule] = useState(false)
   const [resumeKp, setResumeKp] = useState<{ kpId: string; kpTitle: string } | null>(null)
+  // 弹性节奏状态：0=周日~6=周六
+  const [useFlexRhythm, setUseFlexRhythm] = useState(false)
+  const [weekMinutes, setWeekMinutes] = useState<Record<number, number>>({ 0: 60, 1: 60, 2: 60, 3: 60, 4: 60, 5: 0, 6: 0 })
 
   // Fetch resume position
   useEffect(() => {
@@ -127,10 +130,14 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
     if (!dailyMinutes || parseInt(dailyMinutes) < 10) return
     setScheduling(true)
     try {
+      const body: Record<string, any> = { dailyStudyMinutes: parseInt(dailyMinutes) }
+      if (useFlexRhythm) {
+        body.weeklySchedule = JSON.stringify(weekMinutes)
+      }
       const res = await fetch(`/api/courses/${course.id}/schedule`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dailyStudyMinutes: parseInt(dailyMinutes) }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (res.ok) {
@@ -369,7 +376,7 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
       )}
 
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>自动排期 — {course.title}</DialogTitle>
           </DialogHeader>
@@ -388,6 +395,85 @@ export function CourseDetail({ course: initialCourse, stats }: { course: Course;
                 算法将按模块树的顺序，每天安排不超过此时长的模块。
               </p>
             </div>
+
+            {/* 弹性节奏 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setUseFlexRhythm((v) => !v)}
+                  className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                    useFlexRhythm ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  弹性节奏
+                </button>
+                {useFlexRhythm && (
+                  <span className="text-[10px] text-muted-foreground">每日不同容量</span>
+                )}
+              </div>
+
+              {useFlexRhythm && (
+                <>
+                  {/* 快捷预设 */}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[
+                      { label: "每天", values: { 0: 60, 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 60 } },
+                      { label: "工作日", values: { 0: 0, 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 0 } },
+                      { label: "周末集中", values: { 0: 120, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 120 } },
+                      { label: "隔天", values: { 0: 60, 1: 0, 2: 60, 3: 0, 4: 60, 5: 0, 6: 60 } },
+                    ].map((preset) => (
+                      <Button
+                        key={preset.label}
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => setWeekMinutes({ ...preset.values })}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+
+                  {/* 7天容量设置 */}
+                  <div className="space-y-1.5">
+                    {[
+                      { day: 0, label: "周日" },
+                      { day: 1, label: "周一" },
+                      { day: 2, label: "周二" },
+                      { day: 3, label: "周三" },
+                      { day: 4, label: "周四" },
+                      { day: 5, label: "周五" },
+                      { day: 6, label: "周六" },
+                    ].map(({ day, label }) => (
+                      <div key={day} className="flex items-center gap-2">
+                        <span className="text-xs w-10 shrink-0 text-muted-foreground">{label}</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="480"
+                          step="10"
+                          value={weekMinutes[day] ?? 60}
+                          onChange={(e) =>
+                            setWeekMinutes((prev) => ({
+                              ...prev,
+                              [day]: Math.max(0, parseInt(e.target.value) || 0),
+                            }))
+                          }
+                          className="h-7 text-xs w-20"
+                        />
+                        <span className="text-[10px] text-muted-foreground">分钟</span>
+                        {weekMinutes[day] === 0 && (
+                          <span className="text-[10px] text-muted-foreground/60">休息</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
             <Button onClick={doSchedule} disabled={scheduling || !dailyMinutes} className="w-full">
               {scheduling ? "排期中..." : "开始排期"}
             </Button>

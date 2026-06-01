@@ -477,6 +477,7 @@ model Course {
   color       String   @default("#8B5CF6")
   isActive          Boolean  @default(true)
   dailyStudyMinutes Int?     // 用户计划的每日学习时长（分钟）
+  weeklySchedule    String   @default("{}") // JSON: {"0":60,...,"6":0} 周日-周六分钟
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
