@@ -15,8 +15,11 @@ export async function GET(req: Request) {
   const pastStart = new Date(today)
   pastStart.setDate(pastStart.getDate() - 30)
 
-  // 串行执行避免 Neon 事务冲突
-  const rebalance = await rebalanceSchedule(session.user.id)
+  // 串行执行；rebalance 可能因 Neon 限制失败，不允许阻断页面
+  let rebalance = { moved: 0, details: [] as any[] }
+  try {
+    rebalance = await rebalanceSchedule(session.user.id)
+  } catch { /* Neon transactions not supported — skip rebalance */ }
   const upcoming = await getUpcomingModules(session.user.id, Math.min(days, 60))
   const pastModules = await prisma.module.findMany({
     where: {
