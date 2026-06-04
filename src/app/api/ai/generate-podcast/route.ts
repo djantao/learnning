@@ -2,15 +2,40 @@ import { auth } from "@/lib/auth"
 import { chatCompletion } from "@/lib/ai/client"
 import { getContentPlain } from "@/lib/ai/skills/content-levels"
 import { prisma } from "@/lib/db"
+import { synthesizePodcast } from "@/lib/tts"
 import { NextResponse } from "next/server"
+
+interface Segment {
+  speaker: string
+  text: string
+}
 
 export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { knowledgePointId } = await req.json()
+  const { knowledgePointId, mode } = await req.json()
   if (!knowledgePointId) return NextResponse.json({ error: "缺少知识点ID" }, { status: 400 })
 
+  // 如果有缓存的播客，直接返回
+  if (mode === "load") {
+    const existing = await prisma.podcast.findFirst({
+      where: { userId: session.user.id, knowledgePointId },
+      orderBy: { createdAt: "desc" },
+    })
+    if (existing) {
+      return NextResponse.json({
+        id: existing.id,
+        segments: JSON.parse(existing.script) as Segment[],
+        title: existing.title,
+        audioBase64: existing.audioData,
+        duration: existing.duration,
+      })
+    }
+    return NextResponse.json(null)
+  }
+
+  // 生成播客脚本
   const kp = await prisma.knowledgePoint.findUnique({
     where: { id: knowledgePointId },
     include: { module: { include: { course: true } } },
@@ -45,7 +70,6 @@ ${snippet || "暂无详细内容，请根据知识点标题发挥"}
 
 小红：嗨大家好！今天我们来聊聊一个很有意思的话题...
 小明：对，这个话题确实非常重要...
-（继续对话）
 
 只输出对话文本，不要任何其他内容。`
 
@@ -62,8 +86,9 @@ ${snippet || "暂无详细内容，请根据知识点标题发挥"}
       return NextResponse.json({ error: "AI 返回播客脚本不足" }, { status: 500 })
     }
 
+    // 解析对话片段
     const lines = script.split("\n").filter((l) => l.trim())
-    const segments: { speaker: string; text: string }[] = []
+    const segments: Segment[] = []
 
     for (const line of lines) {
       const m1 = line.match(/^小明[：:]\s*(.+)/)
@@ -75,16 +100,13 @@ ${snippet || "暂无详细内容，请根据知识点标题发挥"}
       }
     }
 
-    // Fallback: if regex parsing fails, try splitting by speaker name
+    // 备用解析
     if (segments.length < 4) {
       segments.length = 0
       for (const line of lines) {
-        const cleaned = line.replace(/^(小明|小红)[：:]\s*/, "").trim()
-        if (cleaned && line.match(/^(小明|小红)/)) {
-          segments.push({
-            speaker: line.startsWith("小明") ? "小明" : "小红",
-            text: cleaned,
-          })
+        const m = line.match(/^(小明|小红)[：:]\s*(.+)/)
+        if (m) {
+          segments.push({ speaker: m[1], text: m[2].trim() })
         }
       }
     }
@@ -93,7 +115,39 @@ ${snippet || "暂无详细内容，请根据知识点标题发挥"}
       return NextResponse.json({ error: "AI 返回对话格式无法解析" }, { status: 500 })
     }
 
-    return NextResponse.json({ segments, title: `关于「${kp.title}」的播客` })
+    // 使用 Edge TTS 合成音频
+    let audioBase64: string | null = null
+    let duration = 0
+    try {
+      const audioBuffer = await synthesizePodcast(segments)
+      audioBase64 = audioBuffer.toString("base64")
+      // 粗略估算：中文 ~4 字/秒
+      duration = segments.reduce((sum, s) => sum + s.text.length, 0) / 4
+    } catch (ttsErr) {
+      console.error("TTS synthesis failed, continuing without audio:", ttsErr)
+    }
+
+    const title = `关于「${kp.title}」的播客`
+
+    // 持久化到数据库
+    const podcast = await prisma.podcast.create({
+      data: {
+        userId: session.user.id,
+        knowledgePointId,
+        title,
+        script: JSON.stringify(segments),
+        audioData: audioBase64,
+        duration,
+      },
+    })
+
+    return NextResponse.json({
+      id: podcast.id,
+      segments,
+      title,
+      audioBase64,
+      duration,
+    })
   } catch (error) {
     console.error("generate-podcast error:", error)
     return NextResponse.json({ error: "播客生成失败" }, { status: 500 })

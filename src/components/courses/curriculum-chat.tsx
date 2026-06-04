@@ -30,10 +30,37 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
   const [mastery, setMastery] = useState(kp.mastery)
   const [chatOpen, setChatOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [totalXp, setTotalXp] = useState(() => {
-    if (typeof window === "undefined") return 0
-    return parseInt(localStorage.getItem("learnning_xp") || "0", 10)
-  })
+  const [totalXp, setTotalXp] = useState(0)
+
+  // 从数据库加载 XP（首次自动迁移 localStorage 数据）
+  useEffect(() => {
+    async function loadXp() {
+      try {
+        const res = await fetch("/api/user/xp")
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.xp > 0) {
+          setTotalXp(data.xp)
+          return
+        }
+        // 首次：检查是否有 localStorage 旧数据需要迁移
+        const localXp = parseInt(localStorage.getItem("learnning_xp") || "0", 10)
+        if (localXp > 0) {
+          const migrateRes = await fetch("/api/user/xp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ xp: localXp }),
+          })
+          if (migrateRes.ok) {
+            const migrated = await migrateRes.json()
+            setTotalXp(migrated.xp)
+            localStorage.removeItem("learnning_xp") // 迁移后清除旧数据
+          }
+        }
+      } catch {}
+    }
+    loadXp()
+  }, [])
   const [showCelebration, setShowCelebration] = useState(false)
   const [xpGained, setXpGained] = useState(0)
   const [showCompletionPrompt, setShowCompletionPrompt] = useState(false)
@@ -76,9 +103,12 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
       const newXp = totalXp + XP_PER_KP_MASTERED
       setTotalXp(newXp)
       setXpGained(XP_PER_KP_MASTERED)
-      if (typeof window !== "undefined") {
-        localStorage.setItem("learnning_xp", String(newXp))
-      }
+      // 持久化 XP 到数据库
+      fetch("/api/user/xp", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addXp: XP_PER_KP_MASTERED }),
+      }).catch(() => {})
       setShowCelebration(true)
 
       // Achievement reminder

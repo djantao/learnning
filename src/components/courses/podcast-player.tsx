@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Play, Pause, SkipForward, Headphones, VolumeX } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
+import { Loader2, Play, Pause, SkipForward, Headphones, RotateCw } from "lucide-react"
 import { toast } from "sonner"
 
 interface Segment {
@@ -14,132 +15,75 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
   const [segments, setSegments] = useState<Segment[]>([])
   const [title, setTitle] = useState("")
   const [loading, setLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(-1)
-  const [voicesReady, setVoicesReady] = useState(false)
-  const playingRef = useRef(false)
-  const cancelRef = useRef(false)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [duration, setDuration] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // 等待语音库加载完成
+  // 加载已有播客（持久化）
   useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return
-
-    const voices = window.speechSynthesis.getVoices()
-    if (voices.length > 0) {
-      setVoicesReady(true)
-      return
+    async function loadExisting() {
+      setLoading(true)
+      try {
+        const res = await fetch("/api/ai/generate-podcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ knowledgePointId, mode: "load" }),
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data?.segments?.length > 0) {
+          setSegments(data.segments)
+          setTitle(data.title)
+          setDuration(data.duration || 0)
+          if (data.audioBase64) {
+            const blob = base64ToBlob(data.audioBase64, "audio/mp3")
+            setAudioUrl(URL.createObjectURL(blob))
+          }
+        }
+      } catch { /* 静默失败 */ }
+      setLoading(false)
     }
+    loadExisting()
+  }, [knowledgePointId])
 
-    const onVoicesChanged = () => {
-      if (window.speechSynthesis.getVoices().length > 0) {
-        setVoicesReady(true)
-      }
-    }
-    window.speechSynthesis.onvoiceschanged = onVoicesChanged
-    return () => {
-      window.speechSynthesis.onvoiceschanged = null
-    }
-  }, [])
-
-  function pickVoice(gender: "male" | "female"): SpeechSynthesisVoice | null {
-    const voices = window.speechSynthesis.getVoices()
-    if (voices.length === 0) return null
-
-    const zhVoices = voices.filter((v) => v.lang.startsWith("zh"))
-    if (zhVoices.length > 0) {
-      if (gender === "female") {
-        return zhVoices.find((v) => v.name.includes("Huihui") || v.name.toLowerCase().includes("female")) || zhVoices[0]
-      }
-      return zhVoices.find((v) => v.name.includes("Yunyang") || v.name.toLowerCase().includes("male")) || zhVoices[0]
-    }
-
-    return voices.find((v) => v.default) || voices[0]
+  function base64ToBlob(base64: string, mime: string) {
+    const bytes = atob(base64)
+    const buf = new ArrayBuffer(bytes.length)
+    const arr = new Uint8Array(buf)
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+    return new Blob([buf], { type: mime })
   }
 
-  const speakSegment = useCallback(
-    (idx: number): void => {
-      if (idx >= segments.length || cancelRef.current || !playingRef.current) {
-        setPlaying(false)
-        playingRef.current = false
-        setCurrentIdx(-1)
-        return
+  // 创建 audio 元素并绑定事件
+  useEffect(() => {
+    if (!audioUrl) return
+    const audio = new Audio(audioUrl)
+    audioRef.current = audio
+
+    audio.ontimeupdate = () => {
+      if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100)
+      if (duration > 0) {
+        const pct = audio.currentTime / duration
+        setCurrentIdx(Math.min(Math.floor(pct * segments.length), segments.length - 1))
       }
+    }
+    audio.onended = () => { setPlaying(false); setCurrentIdx(-1); setProgress(0) }
+    audio.onerror = () => { toast.error("音频播放失败"); setPlaying(false) }
 
-      const seg = segments[idx]
-      if (!seg) {
-        speakSegment(idx + 1)
-        return
-      }
-
-      const voice = pickVoice(seg.speaker === "小明" ? "male" : "female")
-
-      const u = new SpeechSynthesisUtterance(seg.text)
-      u.lang = "zh-CN"
-      u.rate = 1.05
-      u.volume = 1
-      if (voice) u.voice = voice
-
-      u.onstart = () => {
-        setCurrentIdx(idx)
-      }
-
-      u.onend = () => {
-        if (!cancelRef.current && playingRef.current) {
-          speakSegment(idx + 1)
-        }
-      }
-
-      u.onerror = (e) => {
-        if (e.error !== "interrupted" && e.error !== "canceled") {
-          console.warn("Speech error:", e.error)
-        }
-        if (!cancelRef.current && playingRef.current) {
-          speakSegment(idx + 1)
-        }
-      }
-
-      window.speechSynthesis.speak(u)
-    },
-    [segments],
-  )
-
-  const startPlayback = useCallback(() => {
-    if (segments.length === 0 || !voicesReady) return
-    window.speechSynthesis.cancel()
-    cancelRef.current = false
-    playingRef.current = true
-    setPlaying(true)
-    speakSegment(0)
-  }, [segments, speakSegment, voicesReady])
-
-  const pausePlayback = useCallback(() => {
-    window.speechSynthesis.pause()
-    setPlaying(false)
-    playingRef.current = false
-  }, [])
-
-  const resumePlayback = useCallback(() => {
-    playingRef.current = true
-    setPlaying(true)
-    window.speechSynthesis.resume()
-  }, [])
-
-  const stopPlayback = useCallback(() => {
-    cancelRef.current = true
-    window.speechSynthesis.cancel()
-    setPlaying(false)
-    playingRef.current = false
-    setCurrentIdx(-1)
-  }, [])
+    return () => { audio.pause(); audio.src = "" }
+  }, [audioUrl, duration, segments.length])
 
   async function generate() {
-    setLoading(true)
-    stopPlayback()
+    setGenerating(true)
     try {
       const res = await fetch("/api/ai/generate-podcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ knowledgePointId }),
+        body: JSON.stringify({ knowledgePointId, mode: "generate" }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -147,91 +91,78 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
         return
       }
       const data = await res.json()
-      if (!data.segments || data.segments.length === 0) {
-        toast.error("播客内容为空，请重试")
-        return
+      if (!data.segments?.length) { toast.error("播客内容为空"); return }
+      setSegments(data.segments)
+      setTitle(data.title)
+      setDuration(data.duration || 0)
+      if (data.audioBase64) {
+        const blob = base64ToBlob(data.audioBase64, "audio/mp3")
+        setAudioUrl(URL.createObjectURL(blob))
       }
-      setSegments(data.segments || [])
-      setTitle(data.title || "")
-      toast.success("播客已生成，点击播放")
+      toast.success("播客已生成！")
     } catch {
       toast.error("播客生成失败")
     }
-    setLoading(false)
+    setGenerating(false)
   }
 
-  const supported = typeof window !== "undefined" && "speechSynthesis" in window
+  const togglePlay = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) { audio.pause(); setPlaying(false) }
+    else { audio.play().catch(() => toast.error("播放失败")); setPlaying(true) }
+  }, [playing])
 
-  if (!supported) {
-    return (
-      <Button variant="ghost" size="sm" disabled className="gap-1.5 text-xs">
-        <VolumeX className="h-3.5 w-3.5" />
-        不支持语音
-      </Button>
-    )
-  }
+  const stopPlayback = useCallback(() => {
+    audioRef.current?.pause()
+    if (audioRef.current) audioRef.current.currentTime = 0
+    setPlaying(false); setCurrentIdx(-1); setProgress(0)
+  }, [])
+
+  const seekTo = useCallback((pct: number) => {
+    const audio = audioRef.current
+    if (audio?.duration) { audio.currentTime = (pct / 100) * audio.duration; setProgress(pct) }
+  }, [])
+
+  const hasPodcast = segments.length > 0
 
   return (
-    <div className="flex items-center gap-1">
-      {segments.length === 0 ? (
-        <Button variant="ghost" size="sm" onClick={generate} disabled={loading} className="gap-1.5 text-xs">
-          {loading ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              生成播客...
-            </>
-          ) : (
-            <>
-              <Headphones className="h-3.5 w-3.5" />
-              播客
-            </>
-          )}
+    <div className="flex items-center gap-2">
+      {loading ? (
+        <Button variant="ghost" size="sm" disabled className="gap-1.5 text-xs">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />加载中...
+        </Button>
+      ) : !hasPodcast ? (
+        <Button variant="ghost" size="sm" onClick={generate} disabled={generating} className="gap-1.5 text-xs">
+          {generating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />生成播客...</>
+            : <><Headphones className="h-3.5 w-3.5" />播客</>}
         </Button>
       ) : (
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={playing ? pausePlayback : resumePlayback}
-            disabled={!voicesReady}
-            className="gap-1.5 text-xs h-7 px-2"
-          >
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={togglePlay} className="gap-1.5 text-xs h-7 px-2">
             {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {playing ? "暂停" : voicesReady ? "播放" : "加载语音..."}播客
+            {playing ? "暂停" : "播放"}
           </Button>
+          <div className="w-20 sm:w-32">
+            <Slider value={[progress]} onValueChange={(v) => seekTo(Array.isArray(v) ? v[0] : v)} max={100} step={0.5} className="h-1" />
+          </div>
           <Button variant="ghost" size="sm" onClick={stopPlayback} className="h-7 w-7 p-0" title="停止">
             <SkipForward className="h-3 w-3" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={generate}
-            disabled={loading}
-            className="text-xs h-7 px-1.5 text-muted-foreground"
-            title="重新生成"
-          >
-            <Loader2 className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+          <Button variant="ghost" size="sm" onClick={generate} disabled={generating}
+            className="text-xs h-7 px-1.5 text-muted-foreground" title="重新生成">
+            <RotateCw className={`h-3 w-3 ${generating ? "animate-spin" : ""}`} />
           </Button>
         </div>
       )}
-
-      {segments.length > 0 && (playing || currentIdx >= 0) && (
-        <div className="flex items-center gap-1 ml-2">
+      {hasPodcast && (playing || currentIdx >= 0) && (
+        <div className="hidden sm:flex items-center gap-0.5 ml-1">
           {segments.map((seg, i) => (
-            <span
-              key={i}
-              className={`text-xs w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
-                i === currentIdx
-                  ? seg.speaker === "小明"
-                    ? "bg-blue-500 text-white"
-                    : "bg-pink-500 text-white"
-                  : i < currentIdx
-                    ? "bg-muted text-muted-foreground"
-                    : "bg-muted/30 text-muted-foreground/30"
-              }`}
-            >
-              {seg.speaker[0]}
-            </span>
+            <span key={i} className={`text-[10px] w-4 h-4 rounded-full flex items-center justify-center transition-colors ${
+              i === currentIdx
+                ? seg.speaker === "小明" ? "bg-[#007AFF] text-white dark:bg-[#0A84FF]" : "bg-[#FF375F] text-white dark:bg-[#FF453A]"
+                : i < currentIdx ? "bg-muted text-muted-foreground" : "bg-muted/30 text-muted-foreground/30"
+            }`}>{seg.speaker[0]}</span>
           ))}
         </div>
       )}

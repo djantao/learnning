@@ -40,6 +40,13 @@ model User {
   resumeKpId         String?
   resumeUpdatedAt    DateTime?
 
+  // XP & Level (migrated from localStorage)
+  xp                 Int       @default(0)
+  level              Int       @default(1)
+
+  // Podcasts
+  podcasts           Podcast[]
+
   // Auth.js fields
   accounts   Account[]
   sessions   Session[]
@@ -556,4 +563,22 @@ model ModuleQuiz {
   diagnosis String?
   status    String   @default("generated")
   createdAt DateTime @default(now())
+}
+
+// ============================================================
+// PODCAST
+// ============================================================
+
+model Podcast {
+  id               String   @id @default(cuid())
+  userId           String
+  knowledgePointId String
+  title            String
+  script           String   // JSON: Segment[]
+  audioData        String?  // base64 MP3 audio (or URL)
+  duration         Float    @default(0) // seconds
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
