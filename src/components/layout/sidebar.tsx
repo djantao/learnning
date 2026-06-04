@@ -19,7 +19,7 @@ import {
   BarChart3,
 } from "lucide-react"
 
-const navItems = [
+export const navItems = [
   { href: "/", label: "仪表盘", icon: LayoutDashboard, exact: true },
   { href: "/courses", label: "课程", icon: GraduationCap },
   { href: "/schedule", label: "学习排期", icon: CalendarClock },
@@ -34,7 +34,7 @@ const navItems = [
   { href: "/search", label: "搜索", icon: Search },
 ]
 
-const bottomItems = [
+export const bottomItems = [
   { href: "/settings", label: "设置", icon: Settings },
 ]
 
@@ -42,7 +42,7 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="flex w-16 flex-col items-center border-r bg-card py-4 gap-1 shrink-0">
+    <aside className="hidden lg:flex w-16 flex-col items-center border-r bg-card py-4 gap-1 shrink-0">
       <Link href="/" className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
         MF
       </Link>
