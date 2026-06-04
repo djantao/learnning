@@ -2,7 +2,6 @@ import { auth } from "@/lib/auth"
 import { chatCompletion } from "@/lib/ai/client"
 import { getContentPlain } from "@/lib/ai/skills/content-levels"
 import { prisma } from "@/lib/db"
-import { synthesizePodcast } from "@/lib/tts"
 import { NextResponse } from "next/server"
 
 interface Segment {
@@ -115,28 +114,17 @@ ${snippet || "暂无详细内容，请根据知识点标题发挥"}
       return NextResponse.json({ error: "AI 返回对话格式无法解析" }, { status: 500 })
     }
 
-    // 使用 Edge TTS 合成音频
-    let audioBase64: string | null = null
-    let duration = 0
-    try {
-      const audioBuffer = await synthesizePodcast(segments)
-      audioBase64 = audioBuffer.toString("base64")
-      // 粗略估算：中文 ~4 字/秒
-      duration = segments.reduce((sum, s) => sum + s.text.length, 0) / 4
-    } catch (ttsErr) {
-      console.error("TTS synthesis failed, continuing without audio:", ttsErr)
-    }
-
     const title = `关于「${kp.title}」的播客`
+    // 粗略估算：中文 ~4 字/秒
+    const duration = segments.reduce((sum, s) => sum + s.text.length, 0) / 4
 
-    // 持久化到数据库
+    // 持久化脚本到数据库（音频由客户端合成）
     const podcast = await prisma.podcast.create({
       data: {
         userId: session.user.id,
         knowledgePointId,
         title,
         script: JSON.stringify(segments),
-        audioData: audioBase64,
         duration,
       },
     })
@@ -145,7 +133,6 @@ ${snippet || "暂无详细内容，请根据知识点标题发挥"}
       id: podcast.id,
       segments,
       title,
-      audioBase64,
       duration,
     })
   } catch (error) {

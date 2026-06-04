@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Loader2, Play, Pause, SkipForward, Headphones, RotateCw } from "lucide-react"
 import { toast } from "sonner"
+import { synthesizePodcastClient } from "@/lib/tts-client"
 
 interface Segment {
   speaker: string
@@ -16,6 +17,8 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
   const [title, setTitle] = useState("")
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [synthesizing, setSynthesizing] = useState(false)
+  const [synthProgress, setSynthProgress] = useState({ current: 0, total: 0 })
   const [playing, setPlaying] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(-1)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -23,7 +26,7 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
   const [progress, setProgress] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // 加载已有播客（持久化）
+  // 加载已有播客脚本
   useEffect(() => {
     async function loadExisting() {
       setLoading(true)
@@ -39,12 +42,13 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
           setSegments(data.segments)
           setTitle(data.title)
           setDuration(data.duration || 0)
+          // 服务端如果有音频就用（缓存命中），否则客户端合成
           if (data.audioBase64) {
             const blob = base64ToBlob(data.audioBase64, "audio/mp3")
             setAudioUrl(URL.createObjectURL(blob))
           }
         }
-      } catch { /* 静默失败 */ }
+      } catch { /* 静默 */ }
       setLoading(false)
     }
     loadExisting()
@@ -58,7 +62,7 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
     return new Blob([buf], { type: mime })
   }
 
-  // 创建 audio 元素并绑定事件
+  // 当 audioUrl 变化时，创建 audio 元素
   useEffect(() => {
     if (!audioUrl) return
     const audio = new Audio(audioUrl)
@@ -66,7 +70,7 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
 
     audio.ontimeupdate = () => {
       if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100)
-      if (duration > 0) {
+      if (duration > 0 && segments.length > 0) {
         const pct = audio.currentTime / duration
         setCurrentIdx(Math.min(Math.floor(pct * segments.length), segments.length - 1))
       }
@@ -77,7 +81,8 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
     return () => { audio.pause(); audio.src = "" }
   }, [audioUrl, duration, segments.length])
 
-  async function generate() {
+  // 生成脚本
+  async function generateScript() {
     setGenerating(true)
     try {
       const res = await fetch("/api/ai/generate-podcast", {
@@ -88,27 +93,48 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         toast.error(err.error || "播客生成失败")
-        return
+        return false
       }
       const data = await res.json()
-      if (!data.segments?.length) { toast.error("播客内容为空"); return }
+      if (!data.segments?.length) { toast.error("播客内容为空"); return false }
       setSegments(data.segments)
       setTitle(data.title)
       setDuration(data.duration || 0)
-      if (data.audioBase64) {
-        const blob = base64ToBlob(data.audioBase64, "audio/mp3")
-        setAudioUrl(URL.createObjectURL(blob))
-      }
-      toast.success("播客已生成！")
-    } catch {
-      toast.error("播客生成失败")
+      setAudioUrl(null) // 重置音频，等客户端合成
+      return true
+    } catch { toast.error("播客生成失败"); return false }
+    finally { setGenerating(false) }
+  }
+
+  // 客户端合成音频（浏览器直连微软 TTS）
+  async function synthesize() {
+    if (segments.length === 0) return false
+    setSynthesizing(true)
+    setSynthProgress({ current: 0, total: segments.length })
+    try {
+      const url = await synthesizePodcastClient(segments, (idx, total) => {
+        setSynthProgress({ current: idx + 1, total })
+      })
+      setAudioUrl(url)
+      toast.success("音频合成完成！")
+      return true
+    } catch (err: any) {
+      toast.error(err.message || "音频合成失败")
+      return false
     }
-    setGenerating(false)
+    finally { setSynthesizing(false); setSynthProgress({ current: 0, total: 0 }) }
+  }
+
+  // 生成 + 合成
+  async function generateAndSynthesize() {
+    const ok = await generateScript()
+    if (!ok) return
+    await synthesize()
   }
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current
-    if (!audio) return
+    if (!audio) { toast.error("请先生成播客"); return }
     if (playing) { audio.pause(); setPlaying(false) }
     else { audio.play().catch(() => toast.error("播放失败")); setPlaying(true) }
   }, [playing])
@@ -124,20 +150,42 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
     if (audio?.duration) { audio.currentTime = (pct / 100) * audio.duration; setProgress(pct) }
   }, [])
 
-  const hasPodcast = segments.length > 0
+  const hasScript = segments.length > 0
+  const hasAudio = !!audioUrl
+  const canPlay = hasScript && hasAudio && !synthesizing
 
   return (
     <div className="flex items-center gap-2">
+      {/* 初始状态：加载或显示播客按钮 */}
       {loading ? (
         <Button variant="ghost" size="sm" disabled className="gap-1.5 text-xs">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />加载中...
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />加载...
         </Button>
-      ) : !hasPodcast ? (
-        <Button variant="ghost" size="sm" onClick={generate} disabled={generating} className="gap-1.5 text-xs">
-          {generating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />生成播客...</>
-            : <><Headphones className="h-3.5 w-3.5" />播客</>}
+      ) : synthesizing ? (
+        <Button variant="ghost" size="sm" disabled className="gap-1.5 text-xs">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          合成中 {synthProgress.current}/{synthProgress.total}
         </Button>
+      ) : generating ? (
+        <Button variant="ghost" size="sm" disabled className="gap-1.5 text-xs">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />生成脚本...
+        </Button>
+      ) : !hasScript ? (
+        <Button variant="ghost" size="sm" onClick={generateAndSynthesize} className="gap-1.5 text-xs">
+          <Headphones className="h-3.5 w-3.5" />播客
+        </Button>
+      ) : !hasAudio ? (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={synthesize} className="gap-1.5 text-xs h-7 px-2">
+            <Headphones className="h-3.5 w-3.5" />合成音频
+          </Button>
+          <Button variant="ghost" size="sm" onClick={generateAndSynthesize} disabled={generating}
+            className="text-xs h-7 px-1.5 text-muted-foreground" title="重新生成脚本">
+            <RotateCw className={`h-3 w-3 ${generating ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       ) : (
+        /* 有脚本有音频 → 播放器 */
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={togglePlay} className="gap-1.5 text-xs h-7 px-2">
             {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
@@ -149,13 +197,15 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
           <Button variant="ghost" size="sm" onClick={stopPlayback} className="h-7 w-7 p-0" title="停止">
             <SkipForward className="h-3 w-3" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={generate} disabled={generating}
+          <Button variant="ghost" size="sm" onClick={generateAndSynthesize} disabled={generating || synthesizing}
             className="text-xs h-7 px-1.5 text-muted-foreground" title="重新生成">
             <RotateCw className={`h-3 w-3 ${generating ? "animate-spin" : ""}`} />
           </Button>
         </div>
       )}
-      {hasPodcast && (playing || currentIdx >= 0) && (
+
+      {/* 进度指示器 */}
+      {hasScript && (playing || currentIdx >= 0) && (
         <div className="hidden sm:flex items-center gap-0.5 ml-1">
           {segments.map((seg, i) => (
             <span key={i} className={`text-[10px] w-4 h-4 rounded-full flex items-center justify-center transition-colors ${
