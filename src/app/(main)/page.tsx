@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Brain, BookOpen, MessageSquare, TrendingUp, Target, AlertTriangle, Star, GraduationCap, Clock, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react"
+import { Brain, BookOpen, MessageSquare, TrendingUp, Target, AlertTriangle, Star, GraduationCap, Clock, CheckCircle2, ArrowRight, AlertCircle, Flame, Zap } from "lucide-react"
 import { getTodayModules, rebalanceSchedule } from "@/lib/schedule"
 import { ResumeButton } from "@/components/courses/resume-button"
 import { StreakCalendar } from "@/components/dashboard/streak-calendar"
@@ -44,6 +44,8 @@ export default async function DashboardPage() {
     overdueModules,
     weeklyCompletedKps,
     resumeUser,
+    todayKpReviews,
+    reviewLogDates,
   ] = await Promise.all([
     prisma.flashcard.count({ where: { userId, isSuspended: false, sm2NextReview: { lte: new Date() } } }),
     prisma.flashcard.count({ where: { userId, isSuspended: false } }),
@@ -74,6 +76,8 @@ export default async function DashboardPage() {
       where: { id: userId },
       select: { resumeCourseId: true, resumeKpId: true, resumeUpdatedAt: true },
     }),
+    prisma.kpReviewLog.count({ where: { userId, createdAt: { gte: new Date(new Date().toDateString()) } } }),
+    prisma.kpReviewLog.findMany({ where: { userId }, select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 90 }),
   ])
 
   // Fetch resume position details if available
@@ -110,7 +114,21 @@ export default async function DashboardPage() {
     if (activityDates.some((a) => new Date(a.date).toDateString() === dateStr)) {
       streak++
     } else if (i === 0) {
-      // Today has no activity yet — streak checks from yesterday
+      continue
+    } else {
+      break
+    }
+  }
+
+  // Review streak (consecutive days with at least one review)
+  let reviewStreak = 0
+  const reviewDateSet = new Set(reviewLogDates.map((l) => new Date(l.createdAt).toDateString()))
+  for (let i = 0; i < 60; i++) {
+    const checkDate = new Date(today)
+    checkDate.setDate(checkDate.getDate() - i)
+    if (reviewDateSet.has(checkDate.toDateString())) {
+      reviewStreak++
+    } else if (i === 0) {
       continue
     } else {
       break
@@ -236,9 +254,29 @@ export default async function DashboardPage() {
             )}
             {cardsDue > 0 && (
               <Link href="/review/session">
-                <Button className="mt-3 w-full" size="sm">开始复习 {cardsDue} 张卡片</Button>
+                <Button className="mt-3 w-full" size="sm">复习 {cardsDue} 张卡片</Button>
               </Link>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">今日复习</CardTitle>
+            <Flame className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {todayKpReviews > 0 ? todayKpReviews : "--"}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {reviewStreak > 0 ? `🔥 ${reviewStreak} 天连续` : "今日未复习"}
+            </p>
+            <Link href="/review/knowledge-points">
+              <Button className="mt-3 w-full" size="sm" variant="outline">
+                <Zap className="h-3.5 w-3.5 mr-1" />知识点复习
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, ArrowRight, Target } from "lucide-react"
+import { AlertTriangle, ArrowRight, Target, Play } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface WeakItem {
   type: string; severity: string; kpId?: string; kpTitle?: string
@@ -13,7 +14,8 @@ interface WeakItem {
 }
 
 export function WeakPointList() {
-  const [data, setData] = useState<{ total: number; items: WeakItem[] } | null>(null)
+  const router = useRouter()
+  const [data, setData] = useState<{ total: number; items: WeakItem[]; lowMasteryCount: number } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,9 +39,15 @@ export function WeakPointList() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-        <AlertTriangle className="h-4 w-4 text-orange-500" />
-        发现 <strong className="text-foreground">{data.total}</strong> 个薄弱项
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <AlertTriangle className="h-4 w-4 text-orange-500" />
+          发现 <strong className="text-foreground">{data.total}</strong> 个薄弱项
+        </div>
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+          onClick={() => router.push("/review/knowledge-points?focus=weak")}>
+          <Play className="h-3 w-3" />复习全部薄弱点
+        </Button>
       </div>
       {data.items.map((item, i) => (
         <div key={i} className="rounded-lg border p-3">
@@ -61,8 +69,10 @@ export function WeakPointList() {
               </div>
             </div>
             {item.kpId && (
-              <Link href={`/courses/`}>
-                <Button variant="ghost" size="sm" className="shrink-0 h-7 text-xs"><ArrowRight className="h-3 w-3" /></Button>
+              <Link href={`/review/knowledge-points/${item.kpId}`}>
+                <Button variant="secondary" size="sm" className="shrink-0 h-7 text-xs gap-1">
+                  复习 <ArrowRight className="h-3 w-3" />
+                </Button>
               </Link>
             )}
           </div>
