@@ -42,7 +42,7 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="hidden lg:flex w-16 flex-col items-center border-r bg-card py-4 gap-1 shrink-0">
+    <aside className="hidden lg:flex w-16 flex-col items-center bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-xl py-4 gap-1 shrink-0 shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.04)]">
       <Link href="/" className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
         MF
       </Link>
@@ -55,10 +55,10 @@ export function Sidebar() {
           key={item.href}
           href={item.href}
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+            "flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200",
             isActive
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "bg-[#007AFF]/10 text-[#007AFF] dark:bg-[#0A84FF]/15 dark:text-[#0A84FF]"
+              : "text-[#86868B] hover:bg-black/5 hover:text-[#1D1D1F] dark:text-[#98989D] dark:hover:bg-white/8 dark:hover:text-[#F5F5F7]"
           )}
         >
           <item.icon className="h-5 w-5" />
@@ -72,10 +72,10 @@ export function Sidebar() {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+              "flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200",
               pathname === item.href
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-[#007AFF]/10 text-[#007AFF] dark:bg-[#0A84FF]/15 dark:text-[#0A84FF]"
+                : "text-[#86868B] hover:bg-black/5 hover:text-[#1D1D1F] dark:text-[#98989D] dark:hover:bg-white/8 dark:hover:text-[#F5F5F7]"
             )}
           >
             <item.icon className="h-5 w-5" />
