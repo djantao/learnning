@@ -147,10 +147,10 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Review Reminder Banner */}
       {dueCardsCount > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
             <Brain className="h-8 w-8 text-amber-500" />
             <div>
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">欢迎回来，{userName}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold">欢迎回来，{userName}</h2>
           <p className="text-muted-foreground">继续你的学习之旅</p>
         </div>
         {streak > 0 && (
@@ -233,7 +233,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">待复习</CardTitle>
@@ -327,7 +327,7 @@ export default async function DashboardPage() {
       <StreakCalendar />
 
       {/* Daily Checklist + Stats Row */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <DailyChecklist />
         </div>
@@ -400,7 +400,7 @@ export default async function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Learning Goals / Projects */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -570,7 +570,7 @@ export default async function DashboardPage() {
       </Card>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Recent Notes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">

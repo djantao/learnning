@@ -43,13 +43,13 @@ export function Navbar() {
   const title = Object.entries(pageTitles).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "MindForge"
 
   return (
-    <header className="flex h-14 items-center justify-between bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-xl px-4 md:px-6 shrink-0 shadow-[0_1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.04)]">
+    <header className="flex h-12 sm:h-14 items-center justify-between bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-xl px-3 sm:px-4 md:px-6 shrink-0 shadow-[0_1px_0_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.04)]">
       <div className="flex items-center gap-2">
         {/* 移动端汉堡菜单按钮 */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger
             render={
-              <Button variant="ghost" size="icon-sm" className="lg:hidden" aria-label="打开菜单">
+              <Button variant="ghost" size="icon-sm" className="lg:hidden" aria-label="打开菜单" id="mobile-menu-btn">
                 <Menu className="h-5 w-5" />
               </Button>
             }
