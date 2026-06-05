@@ -188,68 +188,122 @@ export function Timetable() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-7 gap-3">
-          {/* Day Headers */}
-          {weekDays.map((d, i) => (
-            <div key={i} className={`text-center py-2 rounded-md ${isToday(d) ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-              <p className="text-xs font-medium">{DAY_LABELS[i]}</p>
-              <p className="text-lg font-bold">{d.getDate()}</p>
-              <p className="text-[10px] opacity-70">{d.getMonth() + 1}月</p>
-            </div>
-          ))}
-
-          {/* Day Columns */}
-          {weekDays.map((d, i) => {
-            const key = formatDate(d)
-            const dayModules = byDate[key] || []
-            const dayTotal = dayModules.reduce((s, m) => s + (m.estimatedMinutes || 0), 0)
-            const dayCompleted = dayModules.filter(m => m.status === "completed").length
-
-            return (
-              <div key={i} className={`min-h-[200px] rounded-lg border ${isToday(d) ? "border-primary bg-primary/5" : "border-muted bg-card"} p-2 space-y-2`}>
-                {dayModules.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-8">无安排</p>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground px-1">
-                      <span>{dayCompleted}/{dayModules.length} 完成</span>
-                      <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{formatMinutes(dayTotal)}</span>
-                    </div>
-                    {dayModules.map((m) => {
-                      const oDays = calcOverdueDays(m)
-                      const isOverdue = oDays > 0
-                      const isDone = m.status === "completed"
-                      return (
-                      <Link key={m.id} href={`/courses/${m.course.id}`}>
-                        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${
-                          isOverdue ? "border-red-400 dark:border-red-600 bg-red-50/50 dark:bg-red-950/20" :
-                          isDone ? "opacity-60 border-green-300 dark:border-green-800" : ""
-                        }`}>
-                          <CardContent className="py-2 px-2.5 space-y-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs">{m.course.icon}</span>
-                              <span className="text-[11px] font-medium truncate" title={m.course.title}>{m.course.title}</span>
-                            </div>
-                            <p className="text-xs truncate text-muted-foreground" title={m.title}>{m.title}</p>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-muted-foreground">
-                                {m.estimatedMinutes ? formatMinutes(m.estimatedMinutes) : ""}
-                              </span>
-                              {statusBadge(m)}
-                            </div>
-                            {m.status === "in_progress" && (
-                              <Progress value={m.progressPct} className="h-1" />
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Link>
-                    )})}
-                  </>
-                )}
+        <>
+          {/* Desktop: 7-column grid (unchanged) */}
+          <div className="hidden lg:grid grid-cols-7 gap-3">
+            {weekDays.map((d, i) => (
+              <div key={i} className={`text-center py-2 rounded-md ${isToday(d) ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                <p className="text-xs font-medium">{DAY_LABELS[i]}</p>
+                <p className="text-lg font-bold">{d.getDate()}</p>
+                <p className="text-[10px] opacity-70">{d.getMonth() + 1}月</p>
               </div>
-            )
-          })}
-        </div>
+            ))}
+            {weekDays.map((d, i) => {
+              const key = formatDate(d)
+              const dayModules = byDate[key] || []
+              const dayTotal = dayModules.reduce((s, m) => s + (m.estimatedMinutes || 0), 0)
+              const dayCompleted = dayModules.filter(m => m.status === "completed").length
+              return (
+                <div key={i} className={`min-h-[200px] rounded-lg border ${isToday(d) ? "border-primary bg-primary/5" : "border-muted bg-card"} p-2 space-y-2`}>
+                  {dayModules.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-8">无安排</p>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground px-1">
+                        <span>{dayCompleted}/{dayModules.length} 完成</span>
+                        <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{formatMinutes(dayTotal)}</span>
+                      </div>
+                      {dayModules.map((m) => {
+                        const oDays = calcOverdueDays(m)
+                        const isOverdue = oDays > 0
+                        const isDone = m.status === "completed"
+                        return (
+                        <Link key={m.id} href={`/courses/${m.course.id}`}>
+                          <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${
+                            isOverdue ? "border-red-400 dark:border-red-600 bg-red-50/50 dark:bg-red-950/20" :
+                            isDone ? "opacity-60 border-green-300 dark:border-green-800" : ""
+                          }`}>
+                            <CardContent className="py-2 px-2.5 space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs">{m.course.icon}</span>
+                                <span className="text-[11px] font-medium truncate" title={m.course.title}>{m.course.title}</span>
+                              </div>
+                              <p className="text-xs truncate text-muted-foreground" title={m.title}>{m.title}</p>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-muted-foreground">
+                                  {m.estimatedMinutes ? formatMinutes(m.estimatedMinutes) : ""}
+                                </span>
+                                {statusBadge(m)}
+                              </div>
+                              {m.status === "in_progress" && (
+                                <Progress value={m.progressPct} className="h-1" />
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      )})}
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Mobile: stacked day cards */}
+          <div className="lg:hidden space-y-3">
+            {weekDays.map((d, i) => {
+              const key = formatDate(d)
+              const dayModules = byDate[key] || []
+              const dayTotal = dayModules.reduce((s, m) => s + (m.estimatedMinutes || 0), 0)
+              const dayCompleted = dayModules.filter(m => m.status === "completed").length
+              const today = isToday(d)
+              return (
+                <div key={i} className={`rounded-xl border ${today ? "border-primary/30 bg-primary/5" : "border-muted bg-card"} p-3 space-y-2`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-medium w-5 text-center ${today ? "text-primary font-bold" : "text-muted-foreground"}`}>{DAY_LABELS[i]}</span>
+                      <span className={`text-sm font-bold ${today ? "text-primary" : ""}`}>{d.getDate()}日</span>
+                      <span className="text-xs text-muted-foreground">{d.getMonth() + 1}月</span>
+                      {today && <Badge className="text-[10px]">今天</Badge>}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      {dayModules.length > 0 ? (
+                        <>
+                          <span>{dayCompleted}/{dayModules.length} 完成</span>
+                          <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{formatMinutes(dayTotal)}</span>
+                        </>
+                      ) : (
+                        <span>无安排</span>
+                      )}
+                    </div>
+                  </div>
+                  {dayModules.length > 0 && (
+                    <div className="grid gap-1.5">
+                      {dayModules.map((m) => {
+                        const oDays = calcOverdueDays(m)
+                        return (
+                          <Link key={m.id} href={`/courses/${m.course.id}`}
+                            className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors active:bg-muted ${
+                              oDays > 0 ? "border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-950/20" :
+                              m.status === "completed" ? "opacity-60 border-green-300 dark:border-green-800" :
+                              "hover:border-primary/50"
+                            }`}>
+                            <span className="text-sm shrink-0">{m.course.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{m.title}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{m.course.title}</p>
+                            </div>
+                            <div className="shrink-0">{statusBadge(m)}</div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       {/* Empty State */}
