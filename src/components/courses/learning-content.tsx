@@ -257,7 +257,7 @@ export function LearningContent({ title, content: rawContent, knowledgePointId, 
   return (
     <div className="flex flex-col h-full">
       {/* Tab toolbar */}
-      <div className="flex items-center gap-1 border-b bg-card/50 px-4 py-2 shrink-0">
+      <div className="flex items-center gap-1 border-b bg-card/50 px-2 sm:px-4 py-2 shrink-0 overflow-x-auto flex-nowrap">
         <Button
           variant={tab === "content" ? "secondary" : "ghost"}
           size="sm"
