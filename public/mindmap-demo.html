@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>思维导图 Demo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, "Noto Sans SC", sans-serif;
+  background: #0f172a; color: #e2e8f0;
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; padding: 40px;
+}
+.container { max-width: 1100px; width: 100%; }
+h1 { text-align: center; font-size: 24px; margin-bottom: 8px; }
+.subtitle { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 36px; }
+.tree { display: flex; flex-direction: column; align-items: center; }
+.root-node {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white; padding: 14px 28px; border-radius: 12px;
+  font-size: 18px; font-weight: 700; z-index: 2;
+}
+.branch-line { width: 2px; height: 28px; background: #6366f1; }
+.children-row {
+  display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;
+  position: relative;
+}
+.children-row::before {
+  content: ""; position: absolute; top: 0; left: 8%; right: 8%;
+  height: 2px; background: #6366f1;
+}
+.child-col { display: flex; flex-direction: column; align-items: center; }
+.child-line { width: 2px; height: 18px; background: #4f46e5; }
+.child-node {
+  background: #1e293b; border: 2px solid #4f46e5;
+  padding: 10px 18px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; text-align: center; min-width: 100px; z-index: 1;
+}
+.sub-line { width: 2px; height: 16px; background: #334155; }
+.sub-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.sub-node {
+  background: #1e293b; border: 1px solid #334155;
+  padding: 6px 12px; border-radius: 8px;
+  font-size: 12px; color: #94a3b8; text-align: center; max-width: 140px;
+}
+.sub-node:hover { border-color: #6366f1; color: #e2e8f0; cursor: pointer; }
+.prompt-box {
+  margin-top: 56px; background: #1e293b; border: 1px solid #334155;
+  border-radius: 12px; padding: 20px;
+}
+.prompt-box h3 { font-size: 13px; color: #6366f1; margin-bottom: 12px; }
+.prompt-box pre {
+  white-space: pre-wrap; font-size: 12px; color: #94a3b8;
+  line-height: 1.6; font-family: "JetBrains Mono", monospace;
+}
+.section-divider { margin: 80px 0 10px; border: none; border-top: 1px solid #1e293b; }
+.note { margin-top: 16px; font-size: 11px; color: #475569; text-align: center; }
+.code { color: #22d3ee; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ======= EXAMPLE 1 ======= -->
+  <h1>分支管理与合并</h1>
+  <p class="subtitle">Git 课程 · 子模块思维导图</p>
+  <div class="tree">
+    <div class="root-node">分支管理与合并</div>
+    <div class="branch-line"></div>
+    <div class="children-row">
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">分支概念</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">什么是分支</div>
+          <div class="sub-node">分支指针原理</div>
+          <div class="sub-node">HEAD 与分支关系</div>
+        </div>
+      </div>
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">创建与切换</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">git branch</div>
+          <div class="sub-node">git checkout</div>
+          <div class="sub-node">git switch</div>
+        </div>
+      </div>
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">合并操作</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">fast-forward</div>
+          <div class="sub-node">three-way merge</div>
+          <div class="sub-node">merge commit</div>
+        </div>
+      </div>
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">冲突处理</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">冲突产生原因</div>
+          <div class="sub-node">冲突标记解读</div>
+          <div class="sub-node">rebase 策略</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= EXAMPLE 2 ======= -->
+  <hr class="section-divider">
+  <h1>Prompt 的定义与作用</h1>
+  <p class="subtitle">Prompt 工程课程 · 子模块思维导图</p>
+  <div class="tree">
+    <div class="root-node">Prompt 的定义与作用</div>
+    <div class="branch-line"></div>
+    <div class="children-row">
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">定义与本质</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">Prompt 的字面含义</div>
+          <div class="sub-node">自然语言指令</div>
+          <div class="sub-node">与传统编程的区别</div>
+        </div>
+      </div>
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">核心要素</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">角色设定 Role</div>
+          <div class="sub-node">任务描述 Task</div>
+          <div class="sub-node">输出约束 Format</div>
+          <div class="sub-node">上下文背景 Context</div>
+        </div>
+      </div>
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">作用机制</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">引导模型注意力</div>
+          <div class="sub-node">控制输出质量</div>
+          <div class="sub-node">降低幻觉率</div>
+        </div>
+      </div>
+      <div class="child-col">
+        <div class="child-line"></div><div class="child-node">基础结构</div>
+        <div class="sub-line"></div>
+        <div class="sub-row">
+          <div class="sub-node">系统提示词</div>
+          <div class="sub-node">用户提示词</div>
+          <div class="sub-node">少样本示例</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= PROMPT ======= -->
+  <div class="prompt-box">
+    <h3>实际 AI Prompt（真实调用时用这个）</h3>
+    <pre>你是思维导图生成器。请根据以下知识点内容，提炼出层级化的思维导图结构。
+
+<span class="code"># 实际会从 DB 读取模块下所有 KP 的 content 字段</span>
+模块：${moduleTitle}
+知识点内容：
+${kps.map((kp, i) => `${i + 1}. ${kp.title} — ${kp.content.slice(0, 300)}`).join('\n')}
+
+【输出规则】
+1. 层级：根节点=模块名 → 二级=概念分组（2-4个） → 三级=具体知识点
+2. AI 自动合并相关内容为一组，命名概括该组主题
+3. 每个节点 ≤15 个字
+4. 不要编造不存在的内容
+5. 输出纯 JSON 对象（不要 markdown 代码块）
+
+【输出格式】
+{
+  "root": "${moduleTitle}",
+  "children": [
+    { "title": "概念分组1", "children": [{ "title": "知识点1" }, { "title": "知识点2" }] },
+    { "title": "概念分组2", "children": [...] }
+  ]
+}</pre>
+  </div>
+
+  <p class="note">一个子模块约 4 个知识点，input ~1500 token + output ~400 token，总共 ~1900 token ≈ 几分钱</p>
+</div>
+</body>
+</html>

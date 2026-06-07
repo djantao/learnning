@@ -44,3 +44,23 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# playwright mcp logs
+.playwright-mcp/
+
+# android build artifacts
+android/
+
+# test results
+test-results/
+
+# database
+dev.db
+
+# screenshots
+*.png
+*.jpg
+*.jpeg
+
+# page snapshots
+page-*.yml
