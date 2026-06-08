@@ -11,7 +11,7 @@ import { MindMapView } from "@/components/courses/mindmap-view"
 import { XpCelebration } from "@/components/courses/xp-celebration"
 import { XP_PER_KP_MASTERED, xpToLevel, getLevelTitle } from "@/lib/gamification"
 import { toast } from "sonner"
-import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch } from "lucide-react"
+import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch, Users } from "lucide-react"
 import Link from "next/link"
 
 interface KpData {
@@ -158,6 +158,11 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
             <Button variant="outline" size="sm" onClick={() => setMindmapOpen(true)} className="gap-1.5 text-xs">
               <GitBranch className="h-3.5 w-3.5" />思维导图
             </Button>
+            <Link href={`/coach?kpId=${kp.id}`}>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs border-blue-300 text-blue-600 hover:bg-blue-50">
+                <Users className="h-3.5 w-3.5" />教练问答
+              </Button>
+            </Link>
             <Button
               variant={chatOpen ? "secondary" : "outline"}
               size="sm"
