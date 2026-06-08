@@ -330,25 +330,25 @@ export async function getOrCreateSession(userId: string, targetKpId?: string): P
   const progress = await getUserProgress(userId, targetKpId)
   if (!progress) return null
 
-  let session = await prisma.coachSession.create({
+  const created = await prisma.coachSession.create({
     data: { userId, courseId: progress.courseId, knowledgePointId: progress.kpId, difficulty: progress.difficulty },
   })
 
-  session = await prisma.coachSession.findUnique({
-    where: { id: session.id },
+  const full = await prisma.coachSession.findUnique({
+    where: { id: created.id },
     include: { course: { select: { title: true } }, knowledgePoint: { select: { title: true } } },
   })
-  if (!session) return null
+  if (!full) return null
 
   return {
-    sessionId: session.id,
-    courseTitle: session.course?.title ?? progress.courseTitle,
-    kpTitle: session.knowledgePoint?.title ?? progress.kpTitle,
-    courseId: session.courseId ?? undefined,
-    kpId: session.knowledgePointId ?? undefined,
-    difficulty: session.difficulty,
+    sessionId: full.id,
+    courseTitle: full.course?.title ?? progress.courseTitle,
+    kpTitle: full.knowledgePoint?.title ?? progress.kpTitle,
+    courseId: full.courseId ?? undefined,
+    kpId: full.knowledgePointId ?? undefined,
+    difficulty: full.difficulty,
     rounds: [],
-    status: session.status,
+    status: full.status,
   }
 }
 
