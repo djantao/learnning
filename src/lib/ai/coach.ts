@@ -194,7 +194,7 @@ ${difficulty === "入门" ? `
     console.error("Coach question generation error:", error)
     return {
       question: `你最近在学「${kpTitle}」，它对你之前理解的概念有新的启发吗？`,
-      reference: "试着把新知识和已有的知识连接起来，找到它们之间的关系。",
+      referenceAnswer: "试着把新知识和已有的知识连接起来，找到它们之间的关系。",
     }
   }
 }
