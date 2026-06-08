@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/coach-push",
-      "schedule": "0 10,20 * * *"
+      "schedule": "0 10 * * *"
     }
   ]
 }
