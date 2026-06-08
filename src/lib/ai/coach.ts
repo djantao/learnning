@@ -181,14 +181,14 @@ ${difficulty === "入门" ? `
     if (!jsonMatch) {
       return {
         question: `在「${kpTitle}」的学习中，你已经了解了基本概念。能用自己的话讲一下它是什么、解决什么问题吗？`,
-        reference: `${kpTitle} 的核心是建立了一套解决该领域问题的思维框架，关键点是理解其设计动机和适用边界。`,
+        referenceAnswer: `${kpTitle} 的核心是建立了一套解决该领域问题的思维框架，关键点是理解其设计动机和适用边界。`,
       }
     }
 
     const parsed = JSON.parse(jsonMatch[0])
     return {
       question: parsed.question || "让我们聊聊你最近学的内容",
-      reference: parsed.reference || "思考一下这个问题的本质",
+      referenceAnswer: parsed.reference || "思考一下这个问题的本质",
     }
   } catch (error) {
     console.error("Coach question generation error:", error)
