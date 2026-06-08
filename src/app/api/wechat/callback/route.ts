@@ -4,12 +4,28 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { generateCoachQuestion } from "@/lib/ai/coach"
 import { sendCustomMessage } from "@/lib/wechat"
+import crypto from "crypto"
+
+function verifySignature(token: string, timestamp: string, nonce: string, signature: string): boolean {
+  const arr = [token, timestamp, nonce].sort()
+  const str = arr.join("")
+  const sha1 = crypto.createHash("sha1").update(str).digest("hex")
+  return sha1 === signature
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const echostr = searchParams.get("echostr")
-  if (echostr) return new Response(echostr)
-  return new Response("ok")
+  const signature = searchParams.get("signature") ?? ""
+  const timestamp = searchParams.get("timestamp") ?? ""
+  const nonce = searchParams.get("nonce") ?? ""
+  const echostr = searchParams.get("echostr") ?? ""
+
+  const token = process.env.WECHAT_TOKEN ?? "learnning"
+
+  if (verifySignature(token, timestamp, nonce, signature)) {
+    return new Response(echostr)
+  }
+  return new Response("signature verification failed", { status: 403 })
 }
 
 export async function POST(req: Request) {
