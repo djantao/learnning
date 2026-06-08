@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 
 type Message = {
@@ -17,7 +17,7 @@ interface Stats {
   today: { coachRounds: number; coachMinutes: number; traditionalMinutes: number }
 }
 
-export default function CoachPage() {
+function CoachPageInner() {
   const searchParams = useSearchParams()
   const targetKpId = searchParams.get("kpId")
 
@@ -339,5 +339,17 @@ export default function CoachPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function CoachPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-lg mx-auto h-[calc(100vh-120px)] flex items-center justify-center">
+        <div className="text-gray-400 text-sm">加载中...</div>
+      </div>
+    }>
+      <CoachPageInner />
+    </Suspense>
   )
 }
