@@ -426,6 +426,7 @@ model DailyActivity {
   notesEdited     Int      @default(0)
   aiConversations Int      @default(0)
   studyMinutes    Int      @default(0)
+  studySeconds    Int      @default(0)  // 计时器精确秒数
   kpsCompleted    Int      @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -527,6 +528,7 @@ model KnowledgePoint {
   status    String   @default("not_started") // not_started | in_progress | mastered
   mastery   Int      @default(0) // 0-5
   sortOrder Int      @default(0)
+  estimatedMinutes  Int?     // AI 估算学习时长（分钟）
   firstOpenedAt DateTime?
   completedAt   DateTime?
   createdAt     DateTime  @default(now())

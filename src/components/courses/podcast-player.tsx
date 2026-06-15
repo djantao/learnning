@@ -24,6 +24,7 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [duration, setDuration] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [textOnly, setTextOnly] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // 加载已有播客脚本
@@ -119,7 +120,8 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
       toast.success("音频合成完成！")
       return true
     } catch (err: any) {
-      toast.error(err.message || "音频合成失败")
+      toast.error("TTS合成失败，可阅读文本播客")
+      setTextOnly(true)
       return false
     }
     finally { setSynthesizing(false); setSynthProgress({ current: 0, total: 0 }) }
@@ -179,6 +181,9 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
           <Button variant="ghost" size="sm" onClick={synthesize} className="gap-1.5 text-xs h-7 px-2">
             <Headphones className="h-3.5 w-3.5" />合成音频
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => setTextOnly(true)} className="text-xs h-7 px-1.5" title="阅读文本播客">
+            阅读
+          </Button>
           <Button variant="ghost" size="sm" onClick={generateAndSynthesize} disabled={generating}
             className="text-xs h-7 px-1.5 text-muted-foreground" title="重新生成脚本">
             <RotateCw className={`h-3 w-3 ${generating ? "animate-spin" : ""}`} />
@@ -214,6 +219,32 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
                 : i < currentIdx ? "bg-muted text-muted-foreground" : "bg-muted/30 text-muted-foreground/30"
             }`}>{seg.speaker[0]}</span>
           ))}
+        </div>
+      )}
+
+      {/* Text-only fallback: show conversation */}
+      {textOnly && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setTextOnly(false)}>
+          <div className="bg-card rounded-xl border shadow-lg max-w-lg w-full mx-4 max-h-[70vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center gap-2"><Headphones className="h-4 w-4" />播客文本</h3>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setTextOnly(false)}>关闭</Button>
+            </div>
+            <div className="space-y-3">
+              {segments.map((seg, i) => (
+                <div key={i} className={`flex gap-2 text-sm ${seg.speaker === "小明" ? "justify-start" : "justify-end"}`}>
+                  <div className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                    seg.speaker === "小明"
+                      ? "bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200"
+                      : "bg-pink-50 dark:bg-pink-950/40 text-pink-800 dark:text-pink-200"
+                  }`}>
+                    <p className="text-[10px] font-medium mb-0.5 opacity-70">{seg.speaker}</p>
+                    <p>{seg.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

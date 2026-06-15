@@ -9,6 +9,7 @@ import { getTodayModules, rebalanceSchedule } from "@/lib/schedule"
 import { ResumeButton } from "@/components/courses/resume-button"
 import { StreakCalendar } from "@/components/dashboard/streak-calendar"
 import { DailyChecklist } from "@/components/dashboard/daily-checklist"
+import { OverdueActions } from "@/components/dashboard/overdue-actions"
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -387,12 +388,15 @@ export default async function DashboardPage() {
                   {overdueModules.slice(0, 6).map((m) => {
                     const overdueDays = Math.ceil((now.getTime() - new Date(m.scheduledDate!).getTime()) / 86400000)
                     return (
-                      <Link key={m.id} href={`/courses/${m.course.id}`}
-                        className="text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-1 rounded-md hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors truncate max-w-[300px]"
-                        title={`${m.course.title} > ${m.title}`}>
-                        {m.course.icon} {m.title}
-                        <span className="ml-1 font-semibold">逾期{overdueDays}天</span>
-                      </Link>
+                      <div key={m.id} className="flex items-center gap-1.5 text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-2 py-1 rounded-md">
+                        <Link href={`/courses/${m.course.id}`}
+                          className="hover:underline truncate max-w-[200px]"
+                          title={`${m.course.title} > ${m.title}`}>
+                          {m.course.icon} {m.title}
+                        </Link>
+                        <span className="font-semibold shrink-0">逾期{overdueDays}天</span>
+                        <OverdueActions moduleId={m.id} />
+                      </div>
                     )
                   })}
                   {overdueModules.length > 6 && (

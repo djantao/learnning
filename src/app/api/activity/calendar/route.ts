@@ -22,6 +22,7 @@ export async function GET(req: Request) {
     select: {
       date: true,
       studyMinutes: true,
+      studySeconds: true,
       kpsCompleted: true,
       cardsReviewed: true,
       notesCreated: true,

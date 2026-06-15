@@ -6,17 +6,19 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 interface DayData {
   date: string
   studyMinutes: number
+  studySeconds: number
   kpsCompleted: number
   cardsReviewed: number
   notesCreated: number
 }
 
-function getIntensity(minutes: number): string {
-  if (minutes === 0) return "bg-muted"
-  if (minutes <= 15) return "bg-emerald-200 dark:bg-emerald-900"
-  if (minutes <= 30) return "bg-emerald-300 dark:bg-emerald-700"
-  if (minutes <= 60) return "bg-emerald-400 dark:bg-emerald-600"
-  if (minutes <= 120) return "bg-emerald-500 dark:bg-emerald-500"
+function getIntensity(day: DayData): string {
+  const total = day.studyMinutes + Math.ceil((day.studySeconds || 0) / 60)
+  if (total === 0) return "bg-muted"
+  if (total <= 15) return "bg-emerald-200 dark:bg-emerald-900"
+  if (total <= 30) return "bg-emerald-300 dark:bg-emerald-700"
+  if (total <= 60) return "bg-emerald-400 dark:bg-emerald-600"
+  if (total <= 120) return "bg-emerald-500 dark:bg-emerald-500"
   return "bg-emerald-600 dark:bg-emerald-400"
 }
 
@@ -119,7 +121,7 @@ export function StreakCalendar() {
                       <TooltipTrigger>
                         <div
                           className={`w-3.5 h-3.5 rounded-sm ${
-                            isFuture ? "bg-transparent border border-muted" : getIntensity(mins)
+                            isFuture ? "bg-transparent border border-muted" : getIntensity(day.data || { studyMinutes: 0, studySeconds: 0, kpsCompleted: 0, cardsReviewed: 0, notesCreated: 0, date: "" })
                           }`}
                         />
                       </TooltipTrigger>
