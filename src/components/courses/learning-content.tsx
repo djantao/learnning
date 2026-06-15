@@ -25,6 +25,7 @@ interface LearningContentProps {
   onMasteryChange: (value: number) => void
   firstOpenedAt?: string | null
   completedAt?: string | null
+  defaultTab?: ActiveTab
 }
 
 function isThinContent(content: string) {
@@ -92,8 +93,8 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: "高阶", label: "高阶" },
 ]
 
-export function LearningContent({ title, content: rawContent, knowledgePointId, moduleTitle, courseTitle, mastery, onMasteryChange, firstOpenedAt: initialFirstOpenedAt, completedAt: initialCompletedAt }: LearningContentProps) {
-  const [tab, setTab] = useState<ActiveTab>("content")
+export function LearningContent({ title, content: rawContent, knowledgePointId, moduleTitle, courseTitle, mastery, onMasteryChange, firstOpenedAt: initialFirstOpenedAt, completedAt: initialCompletedAt, defaultTab }: LearningContentProps) {
+  const [tab, setTab] = useState<ActiveTab>(defaultTab ?? "content")
   const [difficulty, setDifficulty] = useState<Difficulty>("入门")
   const [enriching, setEnriching] = useState(false)
   const [enrichError, setEnrichError] = useState(false)

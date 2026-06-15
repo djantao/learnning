@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Play, CheckCircle2, AlertTriangle } from "lucide-react"
+import { Clock, Play, CheckCircle2, AlertTriangle, Brain, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
 interface ChecklistItem {
@@ -32,9 +32,17 @@ function formatMinutes(m: number): string {
   return `${m}m`
 }
 
+interface ReviewChecklistItem {
+  type: "flashcard" | "knowledge_point" | "wrong_answer"
+  label: string
+  dueCount: number
+  link: string
+}
+
 export function DailyChecklist() {
   const [items, setItems] = useState<ChecklistItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [reviewItems, setReviewItems] = useState<ReviewChecklistItem[]>([])
 
   useEffect(() => {
     fetch("/api/checklist")
@@ -42,6 +50,40 @@ export function DailyChecklist() {
       .then(setItems)
       .catch(() => {})
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/review/overview")
+      .then((r) => r.json())
+      .then((data) => {
+        const items: ReviewChecklistItem[] = []
+        if (data.dueKnowledgePoints > 0) {
+          items.push({
+            type: "knowledge_point",
+            label: "知识点复习",
+            dueCount: data.dueKnowledgePoints,
+            link: "/review/knowledge-points",
+          })
+        }
+        if (data.dueFlashcards > 0) {
+          items.push({
+            type: "flashcard",
+            label: "闪卡复习",
+            dueCount: data.dueFlashcards,
+            link: "/review/session",
+          })
+        }
+        if (data.wrongAnswerKps > 0) {
+          items.push({
+            type: "wrong_answer",
+            label: "错题重温",
+            dueCount: data.wrongAnswerKps,
+            link: "/questions",
+          })
+        }
+        setReviewItems(items)
+      })
+      .catch(() => {})
   }, [])
 
   async function toggleCheck(item: ChecklistItem) {
@@ -72,7 +114,7 @@ export function DailyChecklist() {
     )
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && reviewItems.length === 0) {
     return (
       <div className="rounded-xl border border-dashed p-6 text-center">
         <CheckCircle2 className="h-8 w-8 text-muted-foreground/50 mx-auto" />
@@ -80,6 +122,31 @@ export function DailyChecklist() {
         <Link href="/courses">
           <Button variant="outline" size="sm" className="mt-2">去排课</Button>
         </Link>
+      </div>
+    )
+  }
+
+  // Only review items, no modules — show compact review-only view
+  if (items.length === 0 && reviewItems.length > 0) {
+    return (
+      <div className="rounded-xl border p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Brain className="h-4 w-4 text-primary" />
+          <h4 className="text-sm font-medium">今日复习</h4>
+        </div>
+        <div className="space-y-1">
+          {reviewItems.map((item) => (
+            <Link key={item.type} href={item.link}
+              className="flex items-center gap-3 rounded-lg p-2.5 hover:bg-muted/50 transition-colors"
+            >
+              <Badge variant="secondary" className="text-[10px] shrink-0">
+                {item.dueCount}
+              </Badge>
+              <span className="text-sm flex-1">{item.label}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </Link>
+          ))}
+        </div>
       </div>
     )
   }
@@ -106,6 +173,29 @@ export function DailyChecklist() {
       </div>
 
       <Progress value={items.length > 0 ? (checkedCount / items.length) * 100 : 0} className="h-1.5 mb-3" />
+
+      {/* Review items */}
+      {reviewItems.length > 0 && (
+        <div className="mb-3 pb-3 border-b">
+          <div className="flex items-center gap-2 mb-2">
+            <Brain className="h-3.5 w-3.5 text-primary" />
+            <h4 className="text-xs font-medium text-muted-foreground">今日复习</h4>
+          </div>
+          <div className="space-y-1">
+            {reviewItems.map((item) => (
+              <Link key={item.type} href={item.link}
+                className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted/50 transition-colors"
+              >
+                <Badge variant="secondary" className="text-[10px] shrink-0">
+                  {item.dueCount}
+                </Badge>
+                <span className="text-sm flex-1">{item.label}</span>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         {items.map((item) => {

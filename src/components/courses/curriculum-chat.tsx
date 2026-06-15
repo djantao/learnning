@@ -11,7 +11,7 @@ import { MindMapView } from "@/components/courses/mindmap-view"
 import { XpCelebration } from "@/components/courses/xp-celebration"
 import { XP_PER_KP_MASTERED, xpToLevel, getLevelTitle } from "@/lib/gamification"
 import { toast } from "sonner"
-import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch, Users } from "lucide-react"
+import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch, Users, PenLine } from "lucide-react"
 import Link from "next/link"
 
 interface KpData {
@@ -63,6 +63,9 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
   }, [])
   const [showCelebration, setShowCelebration] = useState(false)
   const [xpGained, setXpGained] = useState(0)
+  const [showMasteryPrompt, setShowMasteryPrompt] = useState(false)
+  const [learningContentKey, setLearningContentKey] = useState(0)
+  const [practiceDefaultTab, setPracticeDefaultTab] = useState<"content" | "practice">("content")
   const [showCompletionPrompt, setShowCompletionPrompt] = useState(false)
   const [completionAction, setCompletionAction] = useState<"article" | "interview" | null>(null)
   const [generating, setGenerating] = useState(false)
@@ -127,6 +130,9 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
       // Trigger module completion prompt if last KP in module
       if (kp.isLastInModule) {
         setShowCompletionPrompt(true)
+      } else {
+        // Show post-mastery review prompt for non-last KPs
+        setShowMasteryPrompt(true)
       }
     }
   }
@@ -179,6 +185,7 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
         {kp.content ? (
           <div className="flex-1 overflow-hidden">
             <LearningContent
+              key={learningContentKey}
               title={kp.title}
               content={kp.content}
               knowledgePointId={kp.id}
@@ -188,6 +195,7 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
               onMasteryChange={updateMastery}
               firstOpenedAt={kp.firstOpenedAt}
               completedAt={kp.completedAt}
+              defaultTab={practiceDefaultTab}
             />
           </div>
         ) : (
@@ -197,6 +205,52 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
               <p className="text-sm">点击右上角"问 AI 老师"来探索这个知识点</p>
               <Button onClick={() => setChatOpen(true)} variant="outline" className="gap-2">
                 <MessageCircle className="h-4 w-4" /> 开始学习
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Post-mastery review prompt */}
+        {showMasteryPrompt && kp.next && (
+          <div className="mx-4 mb-2 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800 p-3 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg shrink-0">🎯</span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                  已掌握！该知识点已加入复习队列
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  明天起可通过间隔重复来巩固记忆
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-3">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 h-8"
+                onClick={() => {
+                  setShowMasteryPrompt(false)
+                  setPracticeDefaultTab("practice")
+                  setLearningContentKey((k) => k + 1)
+                }}
+              >
+                <PenLine className="h-3.5 w-3.5 mr-1" />
+                趁热打铁做练习
+              </Button>
+              <Link href={`/courses/${kp.module.courseId}/learn/${kp.next.id}`}>
+                <Button size="sm" variant="ghost" className="h-8" onClick={() => setShowMasteryPrompt(false)}>
+                  继续下一个
+                  <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </Link>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => setShowMasteryPrompt(false)}
+              >
+                <X className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>

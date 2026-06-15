@@ -46,6 +46,7 @@ export default async function DashboardPage() {
     resumeUser,
     todayKpReviews,
     reviewLogDates,
+    dueKpCount,
   ] = await Promise.all([
     prisma.flashcard.count({ where: { userId, isSuspended: false, sm2NextReview: { lte: new Date() } } }),
     prisma.flashcard.count({ where: { userId, isSuspended: false } }),
@@ -78,6 +79,7 @@ export default async function DashboardPage() {
     }),
     prisma.kpReviewLog.count({ where: { userId, createdAt: { gte: new Date(new Date().toDateString()) } } }),
     prisma.kpReviewLog.findMany({ where: { userId }, select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 90 }),
+    prisma.knowledgePoint.count({ where: { module: { course: { userId } }, mastery: { gte: 4 }, sm2NextReview: { lte: new Date() } } }),
   ])
 
   // Fetch resume position details if available
@@ -149,16 +151,23 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Review Reminder Banner */}
-      {dueCardsCount > 0 && (
+      {(dueCardsCount > 0 || dueKpCount > 0) && (
         <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
             <Brain className="h-8 w-8 text-amber-500" />
             <div>
-              <p className="font-semibold">你有 {dueCardsCount} 张卡片等待复习</p>
+              <p className="font-semibold">
+                {dueCardsCount > 0 && dueKpCount > 0
+                  ? `你有 ${dueCardsCount} 张闪卡和 ${dueKpCount} 个知识点等待复习`
+                  : dueCardsCount > 0
+                    ? `你有 ${dueCardsCount} 张闪卡等待复习`
+                    : `你有 ${dueKpCount} 个知识点等待复习`
+                }
+              </p>
               <p className="text-sm text-muted-foreground">间隔重复是长期记忆的关键，现在花几分钟复习一下吧</p>
             </div>
           </div>
-          <Link href="/review/session">
+          <Link href="/review">
             <Button className="shrink-0">开始复习</Button>
           </Link>
         </div>
@@ -241,22 +250,25 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {cardsDue > 0 ? cardsDue : "🎉"}
+              {cardsDue > 0 || dueKpCount > 0 ? cardsDue + dueKpCount : "🎉"}
               {cardsTotal > 0 && <span className="text-sm font-normal text-muted-foreground"> / {cardsTotal}</span>}
             </div>
-            {cardsTotal > 0 && (
-              <>
-                <Progress value={cardsDue > 0 ? Math.max(5, (cardsDue / cardsTotal) * 100) : 100} className="mt-2 h-2" />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {cardsDue === 0 ? "全部掌握！" : `${masteredCount} 张已掌握`}
-                </p>
-              </>
-            )}
-            {cardsDue > 0 && (
-              <Link href="/review/session">
-                <Button className="mt-3 w-full" size="sm">复习 {cardsDue} 张卡片</Button>
-              </Link>
-            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {cardsDue > 0 && dueKpCount > 0
+                ? `${cardsDue} 张闪卡 · ${dueKpCount} 个知识点`
+                : cardsDue > 0
+                  ? `${cardsDue} 张闪卡待复习`
+                  : dueKpCount > 0
+                    ? `${dueKpCount} 个知识点待复习`
+                    : cardsTotal > 0
+                      ? `${masteredCount} 张已掌握`
+                      : "暂无复习任务"}
+            </p>
+            <Link href="/review">
+              <Button className="mt-3 w-full" size="sm">
+                {cardsDue > 0 || dueKpCount > 0 ? "开始复习" : "复习中心"}
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
@@ -272,9 +284,9 @@ export default async function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-1">
               {reviewStreak > 0 ? `🔥 ${reviewStreak} 天连续` : "今日未复习"}
             </p>
-            <Link href="/review/knowledge-points">
+            <Link href="/review">
               <Button className="mt-3 w-full" size="sm" variant="outline">
-                <Zap className="h-3.5 w-3.5 mr-1" />知识点复习
+                <Brain className="h-3.5 w-3.5 mr-1" />复习中心
               </Button>
             </Link>
           </CardContent>
@@ -341,9 +353,9 @@ export default async function DashboardPage() {
                   <BookOpen className="h-4 w-4" />浏览课程
                 </Button>
               </Link>
-              <Link href="/review/session">
+              <Link href="/review">
                 <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                  <Brain className="h-4 w-4" />复习卡片
+                  <Brain className="h-4 w-4" />复习中心
                 </Button>
               </Link>
               <Link href="/chat">
