@@ -167,30 +167,36 @@ export function NoteEditor({ notebooks, initialNote }: Props) {
         <NoteMarkdownEditor content={content} onChange={setContent} />
       </div>
 
-      {/* Right Sidebar */}
-      <div className="hidden w-64 space-y-4 xl:block shrink-0">
-        <NoteAiSidebar
-          noteId={initialNote?.id ?? null}
-          content={content}
-          title={title}
-          onLinksClick={scrollToLinks}
-        />
+      {/* Right Sidebar — only for existing notes */}
+      {initialNote?.id && (
+        <div className="hidden w-64 space-y-4 xl:block shrink-0">
+          <NoteAiSidebar
+            noteId={initialNote.id}
+            content={content}
+            title={title}
+            onLinksClick={scrollToLinks}
+          />
 
-        {initialNote?.id && (
           <NoteLinksPanel
             noteId={initialNote.id}
             linksFrom={initialNote.linksFrom}
             linksTo={initialNote.linksTo}
           />
-        )}
 
-        {initialNote?.id && (
           <NoteVersionHistory
             noteId={initialNote.id}
             onRestored={() => window.location.reload()}
           />
-        )}
-      </div>
+        </div>
+      )}
+      {/* Minimal sidebar hint for new notes */}
+      {!initialNote?.id && (
+        <div className="hidden w-64 xl:block shrink-0">
+          <p className="text-xs text-muted-foreground text-center pt-8">
+            保存笔记后可使用 AI 功能和版本历史
+          </p>
+        </div>
+      )}
     </div>
   )
 }

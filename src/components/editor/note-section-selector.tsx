@@ -1,6 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { Select, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
 
 interface Section {
   id: string
@@ -28,9 +31,24 @@ export function NoteSectionSelector({ notebooks, sectionId, onChange }: Props) {
     ? notebooks.flatMap((n) => n.sections).find((s) => s.id === sectionId)
     : null
 
+  // No notebooks exist yet — show link to create one
+  if (notebooks.length === 0) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">还没有笔记本</span>
+        <Link href="/notebooks">
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+            <Plus className="h-3 w-3" />
+            创建笔记本
+          </Button>
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center gap-4">
-      <Select value={sectionId || ""} onValueChange={(v) => onChange(v || null)}>
+      <Select value={sectionId ?? ""} onValueChange={(v) => onChange(v || null)}>
         <SelectTrigger className="w-48">
           <SelectValue placeholder="选择笔记本/章节" />
         </SelectTrigger>
@@ -39,11 +57,15 @@ export function NoteSectionSelector({ notebooks, sectionId, onChange }: Props) {
           {notebooks.map((nb) => (
             <SelectGroup key={nb.id}>
               <SelectLabel>{nb.name}</SelectLabel>
-              {nb.sections.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
+              {nb.sections.length === 0 ? (
+                <span className="block px-2 py-1 text-xs text-muted-foreground">暂无章节</span>
+              ) : (
+                nb.sections.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))
+              )}
             </SelectGroup>
           ))}
         </SelectContent>
