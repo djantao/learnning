@@ -30,7 +30,14 @@ export async function POST(req: Request) {
       userId: session.user.id,
       name: body.name,
       description: body.description || "",
+      sections: {
+        create: {
+          name: "默认章节",
+          sortOrder: 0,
+        },
+      },
     },
+    include: { sections: true },
   })
 
   return NextResponse.json(notebook, { status: 201 })

@@ -58,7 +58,12 @@ export function NoteSectionSelector({ notebooks, sectionId, onChange }: Props) {
             <SelectGroup key={nb.id}>
               <SelectLabel>{nb.name}</SelectLabel>
               {nb.sections.length === 0 ? (
-                <span className="block px-2 py-1 text-xs text-muted-foreground">暂无章节</span>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-2">
+                  <span>暂无章节</span>
+                  <Link href="/notebooks" className="text-primary hover:underline">
+                    去创建
+                  </Link>
+                </div>
               ) : (
                 nb.sections.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
