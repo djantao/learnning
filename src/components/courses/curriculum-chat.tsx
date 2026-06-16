@@ -1,18 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat/chat-panel"
-import { NotesPanel } from "@/components/courses/notes-panel"
+import { LearningNotes } from "@/components/notes/learning-notes"
 import { LearningContent } from "@/components/courses/learning-content"
 import { StudyTimer } from "@/components/courses/study-timer"
 import { MindMapView } from "@/components/courses/mindmap-view"
 import { XpCelebration } from "@/components/courses/xp-celebration"
 import { XP_PER_KP_MASTERED, xpToLevel, getLevelTitle } from "@/lib/gamification"
 import { toast } from "sonner"
-import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch, Users, PenLine } from "lucide-react"
+import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch, Users, PenLine, StickyNote } from "lucide-react"
 import Link from "next/link"
 
 interface KpData {
@@ -30,6 +31,7 @@ interface KpData {
 export function CurriculumChat({ kp }: { kp: KpData }) {
   const [mastery, setMastery] = useState(kp.mastery)
   const [chatOpen, setChatOpen] = useState(false)
+  const [rightPanel, setRightPanel] = useState<"notes" | "chat">("notes")
   const [saving, setSaving] = useState(false)
   const [totalXp, setTotalXp] = useState(0)
 
@@ -117,8 +119,13 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
     }
   }
 
+  function openChat() {
+    setChatOpen(true)
+    setRightPanel("chat")
+  }
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-0 relative">
+    <div className="flex h-full gap-0 relative -mx-3 -mt-3 -mb-[calc(1rem+3.25rem+env(safe-area-inset-bottom,0px))] sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 lg:-mx-6 lg:-my-6">
       {/* === MAIN CONTENT === */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top bar */}
@@ -139,7 +146,26 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
                 <Users className="h-3.5 w-3.5" />教练问答
               </Button>
             </Link>
-            <Button variant={chatOpen ? "secondary" : "outline"} size="sm" onClick={() => setChatOpen(!chatOpen)} className="gap-1.5 text-xs">
+            {/* Desktop: toggle right panel chat tab. Mobile: open overlay */}
+            <Button
+              variant={chatOpen || rightPanel === "chat" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => {
+                if (chatOpen) { setChatOpen(false); return }
+                if (rightPanel === "chat") { setRightPanel("notes"); return }
+                openChat()
+              }}
+              className="gap-1.5 text-xs hidden xl:inline-flex"
+            >
+              {rightPanel === "chat" ? <X className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
+              {rightPanel === "chat" ? "关闭" : "AI 老师"}
+            </Button>
+            <Button
+              variant={chatOpen ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setChatOpen(!chatOpen)}
+              className="gap-1.5 text-xs xl:hidden"
+            >
               {chatOpen ? <X className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
               {chatOpen ? "关闭" : "AI 老师"}
             </Button>
@@ -148,7 +174,7 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
 
         {/* Scrollable centered content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto px-6 py-6 space-y-4">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-6">
             {/* Timer + Mastery row */}
             <div className="flex items-center justify-between">
               <StudyTimer />
@@ -185,7 +211,7 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
                 <div className="text-center space-y-4">
                   <p className="text-lg">这个知识点还没有学习内容</p>
                   <p className="text-sm">点击右上角"AI 老师"来探索这个知识点</p>
-                  <Button onClick={() => setChatOpen(true)} variant="outline" className="gap-2">
+                  <Button onClick={openChat} variant="outline" className="gap-2">
                     <MessageCircle className="h-4 w-4" /> 开始学习
                   </Button>
                 </div>
@@ -242,10 +268,55 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
         </div>
       </div>
 
-      {/* === RIGHT PANEL: Notes (hidden on small screens) === */}
+      {/* === RIGHT PANEL (xl+): Tabbed Notes + Chat === */}
       <div className="hidden xl:flex w-80 shrink-0 border-l bg-card flex-col overflow-hidden">
-        <NotesPanel knowledgePointId={kp.id} />
+        {/* Tabs */}
+        <div className="flex border-b shrink-0">
+          <button
+            onClick={() => setRightPanel("notes")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors border-b-2",
+              rightPanel === "notes"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <StickyNote className="h-3.5 w-3.5" />笔记
+          </button>
+          <button
+            onClick={() => setRightPanel("chat")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors border-b-2",
+              rightPanel === "chat"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />AI 老师
+          </button>
+        </div>
+        {/* Panel content */}
+        {rightPanel === "notes" ? (
+          <LearningNotes knowledgePointId={kp.id} />
+        ) : (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <ChatPanel conversations={[]} courseId={kp.module.courseId} knowledgePointId={kp.id} kpTitle={kp.title} />
+          </div>
+        )}
       </div>
+
+      {/* === MOBILE CHAT OVERLAY === */}
+      {chatOpen && (
+        <div className="xl:hidden fixed inset-0 z-50 flex flex-col bg-card">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0 pt-[env(safe-area-inset-top,0px)]">
+            <span className="text-sm font-medium">AI 老师</span>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setChatOpen(false)}><X className="h-4 w-4" /></Button>
+          </div>
+          <div className="flex-1 overflow-hidden pb-[env(safe-area-inset-bottom,0px)]">
+            <ChatPanel conversations={[]} courseId={kp.module.courseId} knowledgePointId={kp.id} kpTitle={kp.title} />
+          </div>
+        </div>
+      )}
 
       {/* === OVERLAYS === */}
       <XpCelebration show={showCelebration} xpGained={xpGained} totalXp={totalXp} onClose={() => setShowCelebration(false)} />
@@ -314,19 +385,6 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
           <MindMapView moduleId={kp.module.id} />
         </DialogContent>
       </Dialog>
-
-      {/* AI Chat panel */}
-      {chatOpen && (
-        <div className="shrink-0 flex flex-col border-l bg-card" style={{ width: 420 }}>
-          <div className="flex items-center justify-between px-3 py-2 border-b">
-            <span className="text-sm font-medium">AI 老师</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setChatOpen(false)}><X className="h-3.5 w-3.5" /></Button>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <ChatPanel conversations={[]} courseId={kp.module.courseId} knowledgePointId={kp.id} kpTitle={kp.title} />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

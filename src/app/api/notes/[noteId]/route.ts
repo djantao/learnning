@@ -30,7 +30,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ noteId: 
 
   const { noteId } = await params
   const body = await req.json()
-  const { title, content, sectionId, isPinned, isArchived } = body
+  const { title, content, sectionId, isPinned, isArchived, noteLayers, currentLayer } = body
 
   const existing = await prisma.page.findFirst({ where: { id: noteId, userId: session.user.id } })
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -49,6 +49,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ noteId: 
       ...(sectionId !== undefined && { sectionId }),
       ...(isPinned !== undefined && { isPinned }),
       ...(isArchived !== undefined && { isArchived }),
+      ...(noteLayers !== undefined && { noteLayers }),
+      ...(currentLayer !== undefined && { currentLayer }),
     },
   })
 
