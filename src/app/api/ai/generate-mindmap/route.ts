@@ -57,6 +57,7 @@ ${kpTexts}
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       maxTokens: 1500,
+      task: "generate_mindmap",
     })
 
     const text = result.choices?.[0]?.message?.content ?? ""

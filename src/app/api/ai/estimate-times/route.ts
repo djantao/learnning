@@ -54,6 +54,7 @@ ${moduleList}
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       maxTokens: 1000,
+      task: "estimate_times",
     })
 
     const text = result.choices?.[0]?.message?.content ?? ""

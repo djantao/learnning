@@ -45,6 +45,7 @@ ${snippet || "暂无详细内容"}
       temperature: 0.3,
       maxTokens: 2000,
       stream: false,
+      task: "generate_diagram",
     })
 
     let mermaid = result.choices?.[0]?.message?.content ?? ""

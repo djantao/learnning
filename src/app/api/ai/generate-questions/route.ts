@@ -55,6 +55,7 @@ ${getContentPlain(kp.content).slice(0, 2000)}
       messages: [{ role: "user", content: prompt }],
       temperature: 0.6,
       maxTokens: isInterview ? 1500 : 800,
+      task: "generate_questions",
     })
 
     const text = result.choices?.[0]?.message?.content ?? ""

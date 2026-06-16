@@ -73,6 +73,7 @@ ${rawText.slice(0, 4000)}`
       messages: [{ role: "user", content: prompt }],
       temperature: mode === "topic" ? 0.5 : 0.3,
       maxTokens: mode === "topic" ? 6000 : 4000,
+      task: "generate_content",
     })
 
     const text = result.choices?.[0]?.message?.content ?? ""

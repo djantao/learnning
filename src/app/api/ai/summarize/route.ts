@@ -36,6 +36,7 @@ Summary:`
       ],
       temperature: 0.3,
       maxTokens: 300,
+      task: "summarize",
     })
 
     const summary = result.choices?.[0]?.message?.content ?? ""

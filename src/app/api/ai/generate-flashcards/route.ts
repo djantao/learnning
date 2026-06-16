@@ -29,6 +29,7 @@ Generate flashcards in this exact JSON format:
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       maxTokens: 2000,
+      task: "generate_flashcards",
     })
 
     const text = result.choices?.[0]?.message?.content ?? "[]"

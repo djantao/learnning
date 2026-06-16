@@ -2,10 +2,32 @@ import { prisma } from "@/lib/db"
 import { getContentPlain } from "./skills/content-levels"
 import { guideExplanationPrompt } from "./skills/guide-explanation"
 
+// ============================================================
+// Context builder — optimized for LLM disk cache hit rate
+//
+// Static prefix first → hits DeepSeek disk cache (10% cost).
+// Dynamic content second. Context levels:
+//   "minimal"  — identity only (~50 tokens)    → structured gen
+//   "standard" — identity + KP content          → evaluation
+//   "full"     — identity + profile + course    → chat / coach
+//                map + anchors + weak areas
+// ============================================================
+
+export type ContextLevel = "minimal" | "standard" | "full"
+
 export interface AIContext {
   systemPrompt: string
   messages: { role: "user" | "assistant" | "system"; content: string }[]
 }
+
+// ---- Static prefix (NEVER changes → always hits disk cache) ---
+const STATIC_IDENTITY = [
+  `You are an AI learning assistant for MindForge (墨源).`,
+  `Help the user learn through active recall and guided discovery.`,
+  `Respond in Chinese unless the user writes in English.`,
+].join("\n")
+
+// ---- Public API ------------------------------------------------
 
 interface BuildContextParams {
   userId: string
@@ -13,103 +35,100 @@ interface BuildContextParams {
   courseId?: string
   knowledgePointId?: string
   conversationHistory?: { role: string; content: string }[]
+  /** Context depth — default "full" for backward compatibility */
+  level?: ContextLevel
 }
 
+/**
+ * Build system prompt + messages.
+ *
+ * Token cost by level (approximate):
+ *   "minimal"  ~50 tokens   — structured gen (flashcards, quizzes, summaries)
+ *   "standard" ~800 tokens  — evaluation (answer grading, recall compare)
+ *   "full"     ~2000 tokens — conversation (AI chat, coach Q&A)
+ */
 export async function buildContext(params: BuildContextParams): Promise<AIContext> {
-  const { userId, topicNoteId, courseId, knowledgePointId, conversationHistory } = params
+  const { userId, topicNoteId, courseId, knowledgePointId, conversationHistory, level = "full" } = params
 
-  if (courseId && knowledgePointId) {
+  // L1: minimal — just static identity (for structured generation)
+  if (level === "minimal") {
+    return makeContext(STATIC_IDENTITY, conversationHistory)
+  }
+
+  // L3: full curriculum context — static prefix first for cache
+  if (courseId && knowledgePointId && level === "full") {
     return buildCurriculumContext(userId, courseId, knowledgePointId, conversationHistory)
   }
 
-  const [profile, anchors, note, relatedNotes, weakAreas] = await Promise.all([
-    prisma.learningProfile.findUnique({ where: { userId } }),
-    prisma.instructionAnchor.findMany({
-      where: { userId, isActive: true },
-      orderBy: { priority: "desc" },
-    }),
-    topicNoteId
-      ? prisma.page.findUnique({ where: { id: topicNoteId } })
-      : null,
-    topicNoteId ? getRelatedNotes(topicNoteId) : [],
-    prisma.blindSpot.findMany({
-      where: { userId, isResolved: false },
-      orderBy: { severity: "desc" },
-      take: 5,
-    }),
+  // L2: standard — identity + limited topic context
+  const [profile, note, relatedNotes, weakAreas] = await Promise.all([
+    level === "full" ? prisma.learningProfile.findUnique({ where: { userId } }) : null,
+    topicNoteId ? prisma.page.findUnique({ where: { id: topicNoteId } }) : null,
+    topicNoteId && level === "full" ? getRelatedNotes(topicNoteId) : [],
+    level === "full"
+      ? prisma.blindSpot.findMany({ where: { userId, isResolved: false }, orderBy: { severity: "desc" }, take: 5 })
+      : [],
   ])
 
-  const parts: string[] = []
+  const anchors = level === "full"
+    ? await prisma.instructionAnchor.findMany({ where: { userId, isActive: true }, orderBy: { priority: "desc" } })
+    : []
 
-  // Core identity
-  parts.push(`You are an AI learning assistant. Your goal is to help the user learn effectively.`)
+  const parts: string[] = [STATIC_IDENTITY]
 
-  // Learning profile (never forget)
   if (profile) {
-    parts.push(`\n## User Learning Profile (ALWAYS keep this in mind)
-- Knowledge Level: ${profile.knowledgeLevel}
-- Learning Goals: ${profile.learningGoals}
-- Preferred Style: ${profile.preferredStyle}
-${profile.preferences ? `- Preferences: ${profile.preferences}` : ""}`)
+    parts.push(`\n## Profile\n- Level: ${profile.knowledgeLevel}\n- Goals: ${profile.learningGoals}\n- Style: ${profile.preferredStyle}${profile.preferences ? `\n- Prefs: ${profile.preferences}` : ""}`)
   }
-
-  // Instruction anchors (permanent instructions)
   if (anchors.length > 0) {
-    parts.push(`\n## Permanent Instructions (NEVER forget these - they are the user's hard rules)
-${anchors.map((a) => `- [${a.category}] ${a.instruction}`).join("\n")}`)
+    parts.push(`\n## Rules\n${anchors.map((a) => `- [${a.category}] ${a.instruction}`).join("\n")}`)
   }
-
-  // Current topic context
   if (note) {
     const truncated = note.contentPlain.slice(0, 2000)
-    parts.push(`\n## Current Topic: ${note.title}
-Content excerpt:
-${truncated}${truncated.length >= 2000 ? "...(truncated)" : ""}`)
+    parts.push(`\n## Topic: ${note.title}\n${truncated}${truncated.length >= 2000 ? "\n...(truncated)" : ""}`)
   }
-
-  // Related notes
   if (relatedNotes.length > 0) {
-    parts.push(`\n## Related Notes (user may refer to these concepts)
-${relatedNotes.map((n) => `- ${n.title}: ${n.excerpt ?? ""}`).join("\n")}`)
+    parts.push(`\n## Related\n${relatedNotes.map((n) => `- ${n.title}: ${n.excerpt ?? ""}`).join("\n")}`)
   }
-
-  // Weak areas
   if (weakAreas.length > 0) {
-    parts.push(`\n## User's Weak Areas (pay special attention to these)
-${weakAreas.map((w) => `- ${w.topic} (severity: ${Math.round(w.severity * 100)}%): ${w.description}`).join("\n")}
-Help the user strengthen these areas when relevant.`)
+    parts.push(`\n## Weak Areas\n${weakAreas.map((w) => `- ${w.topic} (${Math.round(w.severity * 100)}%)`).join(", ")}`)
   }
 
-  const systemPrompt = parts.join("\n")
-
-  const messages: { role: "user" | "assistant" | "system"; content: string }[] = [
-    { role: "system", content: systemPrompt },
-    ...(conversationHistory?.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })) ?? []),
-  ]
-
-  return { systemPrompt, messages }
+  return makeContext(parts.join("\n"), conversationHistory)
 }
 
-async function getRelatedNotes(noteId: string, maxDepth = 1, maxNotes = 5) {
+// ---- Helpers ---------------------------------------------------
+
+function makeContext(
+  systemPrompt: string,
+  history?: { role: string; content: string }[]
+): AIContext {
+  return {
+    systemPrompt,
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...(history?.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })) ?? []),
+    ],
+  }
+}
+
+async function getRelatedNotes(noteId: string, maxNotes = 5) {
   const links = await prisma.noteLink.findMany({
-    where: {
-      OR: [{ sourcePageId: noteId }, { targetPageId: noteId }],
-    },
+    where: { OR: [{ sourcePageId: noteId }, { targetPageId: noteId }] },
     include: {
       sourcePage: { select: { id: true, title: true, excerpt: true } },
       targetPage: { select: { id: true, title: true, excerpt: true } },
     },
     take: maxNotes,
   })
-
   return links.map((l) => {
-    const related = l.sourcePageId === noteId ? l.targetPage : l.sourcePage
-    return { id: related.id, title: related.title, excerpt: related.excerpt }
+    const r = l.sourcePageId === noteId ? l.targetPage : l.sourcePage
+    return { id: r.id, title: r.title, excerpt: r.excerpt }
   })
 }
+
+// ---- Full curriculum context (L3 — chat/coach) -----------------
+// Static prefix + profile + anchors → cache hit (~90% reduction)
+// Dynamic: course map, module KPs, KP content, weak areas
 
 async function buildCurriculumContext(
   userId: string,
@@ -120,9 +139,8 @@ async function buildCurriculumContext(
   const [course, modules, kp, profile, anchors, weakAreas] = await Promise.all([
     prisma.course.findFirst({ where: { id: courseId, userId } }),
     prisma.module.findMany({
-      where: { courseId },
-      orderBy: { sortOrder: "asc" },
-      select: { id: true, title: true, parentModuleId: true, status: true, progressPct: true, sortOrder: true },
+      where: { courseId }, orderBy: { sortOrder: "asc" },
+      select: { id: true, title: true, parentModuleId: true, status: true, sortOrder: true },
     }),
     prisma.knowledgePoint.findUnique({
       where: { id: knowledgePointId },
@@ -133,93 +151,50 @@ async function buildCurriculumContext(
     prisma.blindSpot.findMany({ where: { userId, isResolved: false }, orderBy: { severity: "desc" }, take: 5 }),
   ])
 
-  if (!course || !kp) {
-    return { systemPrompt: "You are a helpful assistant.", messages: [] }
+  if (!course || !kp) return makeContext(STATIC_IDENTITY, conversationHistory)
+
+  // === CACHE-FRIENDLY PREFIX (static identity + profile + anchors) ===
+  const parts: string[] = [STATIC_IDENTITY]
+
+  if (profile) {
+    parts.push(`\n## Profile\n- Level: ${profile.knowledgeLevel}\n- Goals: ${profile.learningGoals}\n- Style: ${profile.preferredStyle}${profile.preferences ? `\n- Prefs: ${profile.preferences}` : ""}`)
+  }
+  if (anchors.length > 0) {
+    parts.push(`\n## Rules\n${anchors.map((a) => `- [${a.category}] ${a.instruction}`).join("\n")}`)
   }
 
-  const parts: string[] = []
+  // === DYNAMIC CONTENT (changes per call — full price) ===
+  const total = modules.filter((m) => !m.parentModuleId).length
+  const done = modules.filter((m) => !m.parentModuleId && m.status === "completed").length
+  parts.push(`\n## Course: ${course.title} (${done}/${total} done) | Module: ${kp.module.title}`)
 
-  // Layer 1: Course overview
-  const totalModules = modules.filter((m) => !m.parentModuleId).length
-  const completedModules = modules.filter((m) => !m.parentModuleId && m.status === "completed").length
-  const currentModuleTitle = kp.module.title
+  // Compact module map
+  const top = modules.filter((m) => !m.parentModuleId)
+  parts.push(`Map: ${top.map((m) => (m.id === kp.moduleId ? "★" : m.status === "completed" ? "✓" : "○") + m.title).join(" | ")}`)
 
-  parts.push(`You are an AI learning coach. You are helping the user learn "${course.title}".`)
-  if (course.description) parts.push(`Course description: ${course.description}`)
-  parts.push(`Overall: ${completedModules}/${totalModules} modules completed. Currently in module "${currentModuleTitle}".`)
-
-  // Layer 2: Module map
-  const topModules = modules.filter((m) => !m.parentModuleId)
-  const moduleMap = topModules.map((m) => {
-    const marker = m.id === kp.moduleId ? "★ CURRENT" : m.status === "completed" ? "✓" : "○"
-    return `${marker} ${m.title} (${m.status === "completed" ? "done" : m.status === "in_progress" ? "in progress" : "not started"})`
-  })
-  parts.push(`\n## Course Map\n${moduleMap.join("\n")}`)
-
-  // Layer 3: Current module detail
-  const currentModule = topModules.find((m) => m.id === kp.moduleId)
-  if (currentModule) {
+  // Module KPs
+  const cur = top.find((m) => m.id === kp.moduleId)
+  if (cur) {
     const kps = await prisma.knowledgePoint.findMany({
-      where: { moduleId: currentModule.id },
-      orderBy: { sortOrder: "asc" },
-      select: { id: true, title: true, status: true, mastery: true },
+      where: { moduleId: cur.id }, orderBy: { sortOrder: "asc" },
+      select: { id: true, title: true, mastery: true },
     })
-
-    const kpLines = kps.map((p) => {
-      const marker = p.id === knowledgePointId ? "→ CURRENT" : p.status === "mastered" ? "✓" : p.status === "in_progress" ? "○" : "·"
-      return `  ${marker} ${p.title} (mastery: ${p.mastery}/5)`
-    })
-
-    parts.push(`\n## Current Module: ${currentModule.title}`)
-    parts.push(`Knowledge points:\n${kpLines.join("\n")}`)
-
-    // Highlight weak points in same module
-    const weakKps = kps.filter((p) => p.id !== knowledgePointId && p.mastery < 3)
-    if (weakKps.length > 0) {
-      const weakNames = weakKps.map((p) => `"${p.title}" (mastery ${p.mastery}/5)`).join(", ")
-      parts.push(`\nRelated weak areas in this module: ${weakNames}. When relevant, suggest revisiting these.`)
-    }
+    parts.push(`\nKPs: ${kps.map((p) => (p.id === knowledgePointId ? "→" : p.mastery >= 4 ? "✓" : "○") + p.title + `(${p.mastery}/5)`).join(" · ")}`)
   }
 
-  // Layer 4: Current knowledge point full content
+  // KP content (trimmed)
   if (kp.content) {
     const plain = getContentPlain(kp.content)
-    const truncated = plain.slice(0, 3000)
-    parts.push(`\n## Current Topic: ${kp.title}`)
-    parts.push(`Content:\n${truncated}${truncated.length >= 3000 ? "\n...(truncated)" : ""}`)
+    parts.push(`\n## ${kp.title}\n${plain.slice(0, 2500)}${plain.length >= 2500 ? "\n...(truncated)" : ""}`)
   }
 
-  // Always include profile and anchors
-  if (profile) {
-    parts.push(`\n## User Learning Profile
-- Knowledge Level: ${profile.knowledgeLevel}
-- Learning Goals: ${profile.learningGoals}
-- Preferred Style: ${profile.preferredStyle}
-${profile.preferences ? `- Preferences: ${profile.preferences}` : ""}`)
-  }
-
-  if (anchors.length > 0) {
-    parts.push(`\n## Permanent Instructions
-${anchors.map((a) => `- [${a.category}] ${a.instruction}`).join("\n")}`)
-  }
-
+  // Weak areas
   if (weakAreas.length > 0) {
-    parts.push(`\n## Known Weak Areas
-${weakAreas.map((w) => `- ${w.topic} (severity: ${Math.round(w.severity * 100)}%): ${w.description}`).join("\n")}`)
+    parts.push(`\n## Weak: ${weakAreas.map((w) => w.topic + `(${Math.round(w.severity * 100)}%)`).join(", ")}`)
   }
 
-  // Inject teaching skill — dictates HOW the AI should interact
-  parts.push(guideExplanationPrompt(kp.title, currentModuleTitle))
+  // Teaching methodology (semi-static, rarely changes)
+  parts.push(guideExplanationPrompt(kp.title, cur?.title ?? kp.module.title))
 
-  const systemPrompt = parts.join("\n")
-
-  const messages: { role: "user" | "assistant" | "system"; content: string }[] = [
-    { role: "system", content: systemPrompt },
-    ...(conversationHistory?.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })) ?? []),
-  ]
-
-  return { systemPrompt, messages }
+  return makeContext(parts.join("\n"), conversationHistory)
 }

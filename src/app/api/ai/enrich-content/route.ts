@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       topP: difficulty === "高阶" ? 0.7 : undefined,
       maxTokens: difficulty === "高阶" ? 8000 : difficulty === "进阶" ? 4000 : 4000,
       stream: difficulty === "高阶" ? false : true,
+      task: "generate_content",
     })
 
     const content = result.choices?.[0]?.message?.content ?? ""

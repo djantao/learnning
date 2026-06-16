@@ -78,6 +78,7 @@ ${snippet || "暂无详细内容，请根据知识点标题发挥"}
       temperature: 0.7,
       maxTokens: 3000,
       stream: false,
+      task: "generate_podcast",
     })
 
     const script = result.choices?.[0]?.message?.content ?? ""

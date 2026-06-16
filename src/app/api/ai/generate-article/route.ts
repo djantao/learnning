@@ -65,6 +65,7 @@ ${kpContent}
       temperature: 0.5,
       maxTokens: 3500,
       stream: false,
+      task: "generate_article",
     })
 
     const content = result.choices?.[0]?.message?.content ?? ""

@@ -43,6 +43,7 @@ export async function POST(req: Request) {
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       maxTokens: 4000,
+      task: "generate_book_outline",
     })
 
     const text = result.choices?.[0]?.message?.content ?? ""
