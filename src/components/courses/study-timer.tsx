@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { cn } from "@/lib/utils"
 import { Play, Pause } from "lucide-react"
 
 interface StudyTimerProps {
@@ -73,11 +74,23 @@ export function StudyTimer({ onFlush }: StudyTimerProps) {
   return (
     <button
       onClick={togglePause}
-      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors select-none"
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all select-none",
+        paused
+          ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
+          : "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50"
+      )}
       title={paused ? "继续计时" : "暂停计时"}
     >
-      {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
-      <span className="font-mono tabular-nums">⏱ {display}</span>
+      {paused ? (
+        <Play className="h-3.5 w-3.5" />
+      ) : (
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+        </span>
+      )}
+      <span className="font-mono tabular-nums">{display}</span>
     </button>
   )
 }

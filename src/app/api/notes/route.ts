@@ -106,6 +106,18 @@ export async function POST(req: Request) {
     }
   }
 
+  // Create version 1 snapshot
+  await prisma.noteVersion.create({
+    data: {
+      pageId: page.id,
+      version: 1,
+      title: page.title,
+      content: page.content,
+      contentPlain: page.contentPlain,
+      wordCount: page.wordCount,
+    },
+  })
+
   trackActivity(session.user.id, { notesCreated: 1 }).catch(() => {})
 
   return NextResponse.json(page, { status: 201 })

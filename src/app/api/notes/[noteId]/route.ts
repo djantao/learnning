@@ -41,6 +41,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ noteId: 
   const excerpt = contentPlain.slice(0, 200)
   const wordCount = contentPlain.split(/\s+/).filter(Boolean).length
 
+  // Create version snapshot BEFORE update if content changed
+  if (content !== undefined && content !== existing.content) {
+    const latestVersion = await prisma.noteVersion.findFirst({
+      where: { pageId: noteId },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    })
+    const nextVersion = (latestVersion?.version ?? 0) + 1
+    await prisma.noteVersion.create({
+      data: {
+        pageId: noteId,
+        version: nextVersion,
+        title: existing.title,
+        content: existing.content,
+        contentPlain: existing.contentPlain,
+        wordCount: existing.wordCount,
+      },
+    })
+  }
+
   const page = await prisma.page.update({
     where: { id: noteId },
     data: {

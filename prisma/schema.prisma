@@ -32,6 +32,7 @@ model User {
   learningGoals      LearningGoal[]
   blindSpots         BlindSpot[]
   dailyActivities    DailyActivity[]
+  blindRecalls       BlindRecall[]
   courses            Course[]
   kpReviewLogs       KpReviewLog[]
 
@@ -216,8 +217,27 @@ model Page {
   attachments Attachment[]
   tags        PageTag[]
   goalMaterials GoalMaterial[]
+  versions    NoteVersion[]
 
   @@unique([userId, slug])
+}
+
+// Note version history — full content snapshot on each save
+model NoteVersion {
+  id            String   @id @default(cuid())
+  pageId        String
+  version       Int
+  title         String
+  content       String
+  contentPlain  String
+  wordCount     Int
+  changeSummary String?
+  createdAt     DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, version])
+  @@index([pageId, createdAt])
 }
 
 // Bidirectional wiki-style links
@@ -355,6 +375,23 @@ model KpReviewLog {
   @@index([userId, createdAt])
 }
 
+model BlindRecall {
+  id               String   @id @default(cuid())
+  userId           String
+  knowledgePointId String
+  userRecall       String           // What user wrote from memory
+  aiComparison     String?          // JSON: {accuracy, gaps[], strengths[], missedConcepts[], suggestion}
+  recallScore      Float?           // 0.0-1.0 AI score
+  timeSpentSeconds Int?
+  createdAt        DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  knowledgePoint KnowledgePoint @relation(fields: [knowledgePointId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, knowledgePointId])
+}
+
 // ============================================================
 // LEARNING PATH TRACKING
 // ============================================================
@@ -430,6 +467,7 @@ model DailyActivity {
   studyMinutes    Int      @default(0)
   studySeconds    Int      @default(0)  // 计时器精确秒数
   kpsCompleted    Int      @default(0)
+  blindRecalls    Int      @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -550,6 +588,7 @@ model KnowledgePoint {
   kpReviewLogs    KpReviewLog[]
   coachSessions   CoachSession[]
   learningSessions LearningSession[]
+  blindRecalls    BlindRecall[]
 }
 
 model MindMap {

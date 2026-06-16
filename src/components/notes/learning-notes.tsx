@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, FileText, Clock, Trash2, ChevronDown, Sparkles, Layers, Brain, ExternalLink, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { formatDate } from "@/lib/format-date"
 
 // ============================================================
-// Unified Learning Notes — replaces KpNotes + NotesPanel
+/// Unified Learning Notes — sidebar + card variants for knowledge-point notes
 // Supports: quick capture, progressive summarization, flashcard bridge
 // ============================================================
 
@@ -145,7 +146,6 @@ export function LearningNotes({ knowledgePointId, variant = "sidebar", onNoteCou
     setGeneratingCards(false)
   }
 
-  function fmt(d: string) { return new Date(d).toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) }
 
   const activeNote = notes.find((n) => n.id === activeId)
   const LAYER_LABELS = ["", "原始笔记", "加粗关键", "高亮核心", "一句话总结", "闪卡就绪"]
@@ -165,7 +165,7 @@ export function LearningNotes({ knowledgePointId, variant = "sidebar", onNoteCou
             </button>
             {dropdownOpen && (
               <div className="absolute top-full left-3 right-3 z-10 mt-1 rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
-                {notes.map((n) => (<button key={n.id} className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-muted ${n.id === activeId ? "bg-muted font-medium" : ""}`} onClick={() => { setActiveId(n.id); setDropdownOpen(false) }}><span className="truncate block">{n.title}</span><span className="text-[10px] text-muted-foreground">{fmt(n.updatedAt)}</span></button>))}
+                {notes.map((n) => (<button key={n.id} className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-muted ${n.id === activeId ? "bg-muted font-medium" : ""}`} onClick={() => { setActiveId(n.id); setDropdownOpen(false) }}><span className="truncate block">{n.title}</span><span className="text-[10px] text-muted-foreground">{formatDate(n.updatedAt)}</span></button>))}
               </div>
             )}
           </div>
@@ -186,7 +186,7 @@ export function LearningNotes({ knowledgePointId, variant = "sidebar", onNoteCou
             {!isNew && editContent.length > 100 && (
               <Button variant="outline" size="sm" className="w-full h-7 text-xs gap-1.5 border-purple-200 text-purple-600 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400" onClick={generateFlashcardsFromNote} disabled={generatingCards}>{generatingCards ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}{generatingCards ? "生成中..." : "从笔记生成闪卡 · 加入复习"}</Button>
             )}
-            {activeNote && <div className="flex items-center gap-2 text-[10px] text-muted-foreground"><Clock className="h-3 w-3" />{fmt(activeNote.updatedAt)}<Badge variant="secondary" className="text-[10px] px-1 py-0">{activeNote.wordCount} 字</Badge><div className="flex-1" /><Link href={`/notes/${activeNote.id}`} target="_blank" className="hover:text-foreground"><ExternalLink className="h-3 w-3" /></Link></div>}
+            {activeNote && <div className="flex items-center gap-2 text-[10px] text-muted-foreground"><Clock className="h-3 w-3" />{formatDate(activeNote.updatedAt)}<Badge variant="secondary" className="text-[10px] px-1 py-0">{activeNote.wordCount} 字</Badge><div className="flex-1" /><Link href={`/notes/${activeNote.id}`} target="_blank" className="hover:text-foreground"><ExternalLink className="h-3 w-3" /></Link></div>}
             <div className="flex items-center justify-between pt-2 border-t">{!isNew && <Button variant="ghost" size="sm" onClick={deleteNote} className="text-red-500 hover:text-red-600 h-7 text-xs gap-1"><Trash2 className="h-3 w-3" />删除</Button>}{isNew && <div />}<Button size="sm" onClick={saveNote} disabled={!editTitle.trim() || saving} className="h-7 text-xs">{saving ? "保存中..." : "保存"}</Button></div>
           </>)}
         </div>
@@ -201,7 +201,7 @@ export function LearningNotes({ knowledgePointId, variant = "sidebar", onNoteCou
       <div className="max-h-[260px] overflow-y-auto">
         {loading ? <div className="py-4 text-sm text-muted-foreground">加载中...</div>
         : notes.length === 0 ? <div className="py-6 text-center"><FileText className="h-6 w-6 mx-auto text-muted-foreground/30 mb-1" /><p className="text-xs text-muted-foreground">暂无笔记</p></div>
-        : <div className="space-y-2">{notes.map((n) => (<button key={n.id} className="w-full text-left" onClick={() => setActiveId(n.id)}><div className="rounded-lg border p-3 cursor-pointer hover:border-primary/50 transition-colors"><div className="flex-1 min-w-0"><span className="text-sm font-medium truncate block">{n.title}</span>{n.excerpt && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.excerpt}</p>}<div className="flex items-center gap-2 mt-1.5"><Clock className="h-3 w-3 text-muted-foreground/50" /><span className="text-[10px] text-muted-foreground/60">{fmt(n.updatedAt)}</span><Badge variant="secondary" className="text-[10px] px-1 py-0">{n.wordCount} 字</Badge></div></div></div></button>))}</div>}
+        : <div className="space-y-2">{notes.map((n) => (<button key={n.id} className="w-full text-left" onClick={() => setActiveId(n.id)}><div className="rounded-lg border p-3 cursor-pointer hover:border-primary/50 transition-colors"><div className="flex-1 min-w-0"><span className="text-sm font-medium truncate block">{n.title}</span>{n.excerpt && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.excerpt}</p>}<div className="flex items-center gap-2 mt-1.5"><Clock className="h-3 w-3 text-muted-foreground/50" /><span className="text-[10px] text-muted-foreground/60">{formatDate(n.updatedAt)}</span><Badge variant="secondary" className="text-[10px] px-1 py-0">{n.wordCount} 字</Badge></div></div></div></button>))}</div>}
       </div>
       {/* Edit modal for card variant */}
       {activeId && (

@@ -10,6 +10,7 @@ import { ResumeButton } from "@/components/courses/resume-button"
 import { StreakCalendar } from "@/components/dashboard/streak-calendar"
 import { DailyChecklist } from "@/components/dashboard/daily-checklist"
 import { OverdueActions } from "@/components/dashboard/overdue-actions"
+import { KnowledgePulse } from "@/components/dashboard/knowledge-pulse"
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -345,32 +346,14 @@ export default async function DashboardPage() {
           <DailyChecklist />
         </div>
         <div className="flex flex-col gap-4">
-          {/* Quick actions card */}
-          <div className="rounded-xl border p-4">
-            <h4 className="text-sm font-medium mb-3">快捷操作</h4>
-            <div className="space-y-2">
-              <Link href="/courses">
-                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                  <BookOpen className="h-4 w-4" />浏览课程
-                </Button>
-              </Link>
-              <Link href="/review">
-                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                  <Brain className="h-4 w-4" />复习中心
-                </Button>
-              </Link>
-              <Link href="/chat">
-                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                  <MessageSquare className="h-4 w-4" />AI 对话
-                </Button>
-              </Link>
-              <Link href="/notes/new">
-                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                  <BookOpen className="h-4 w-4" />写笔记
-                </Button>
-              </Link>
-            </div>
-          </div>
+          {/* Knowledge Pulse — signature element */}
+          <KnowledgePulse
+            studyMinutes={todayActivity?.studyMinutes ?? 0}
+            notesCreated={todayActivity?.notesCreated ?? 0}
+            aiConversations={todayActivity?.aiConversations ?? 0}
+            streak={streak}
+            kpReviewed={todayKpReviews}
+          />
         </div>
       </div>
 

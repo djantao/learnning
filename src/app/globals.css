@@ -82,6 +82,15 @@
   --sidebar-accent-foreground: #007AFF;
   --sidebar-border: rgb(0 0 0 / 0.06);
   --sidebar-ring: #007AFF;
+  /* Semantic tokens */
+  --semantic-success: #34C759;
+  --semantic-success-bg: #F0FFF4;
+  --semantic-warning: #FF9500;
+  --semantic-warning-bg: #FFF8F0;
+  --semantic-danger: #FF3B30;
+  --semantic-danger-bg: #FFF0F0;
+  --semantic-info: #007AFF;
+  --semantic-info-bg: #F0F7FF;
 }
 
 .dark {
@@ -117,6 +126,15 @@
   --sidebar-accent-foreground: #0A84FF;
   --sidebar-border: rgb(255 255 255 / 0.08);
   --sidebar-ring: #0A84FF;
+  /* Semantic tokens — dark */
+  --semantic-success: #30D158;
+  --semantic-success-bg: rgba(48,209,88,0.12);
+  --semantic-warning: #FF9F0A;
+  --semantic-warning-bg: rgba(255,159,10,0.12);
+  --semantic-danger: #FF453A;
+  --semantic-danger-bg: rgba(255,69,58,0.12);
+  --semantic-info: #0A84FF;
+  --semantic-info-bg: rgba(10,132,255,0.12);
 }
 
 @layer base {

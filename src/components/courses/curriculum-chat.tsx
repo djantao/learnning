@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat/chat-panel"
 import { LearningNotes } from "@/components/notes/learning-notes"
+import { BlindRecallOverlay } from "@/components/recall/blind-recall-overlay"
+import type { RecallResult } from "@/components/recall/blind-recall-overlay"
 import { LearningContent } from "@/components/courses/learning-content"
 import { StudyTimer } from "@/components/courses/study-timer"
 import { MindMapView } from "@/components/courses/mindmap-view"
@@ -69,6 +71,8 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
   const [generating, setGenerating] = useState(false)
   const [generatedContent, setGeneratedContent] = useState<{ title: string; content: string } | null>(null)
   const [mindmapOpen, setMindmapOpen] = useState(false)
+  const [showBlindRecall, setShowBlindRecall] = useState(false)
+  const [lastRecallResult, setLastRecallResult] = useState<RecallResult | null>(null)
 
   useEffect(() => { setMastery(kp.mastery) }, [kp.id])
 
@@ -114,8 +118,8 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
         })
       } catch {}
 
-      if (kp.isLastInModule) { setShowCompletionPrompt(true) }
-      else { setShowMasteryPrompt(true) }
+      // 核心改动：弹出全屏盲写回忆，取代之前的小横幅
+      setShowBlindRecall(true)
     }
   }
 
