@@ -15,11 +15,11 @@ interface DayData {
 function getIntensity(day: DayData): string {
   const total = day.studyMinutes + Math.ceil((day.studySeconds || 0) / 60)
   if (total === 0) return "bg-muted"
-  if (total <= 15) return "bg-emerald-200 dark:bg-emerald-900"
-  if (total <= 30) return "bg-emerald-300 dark:bg-emerald-700"
-  if (total <= 60) return "bg-emerald-400 dark:bg-emerald-600"
-  if (total <= 120) return "bg-emerald-500 dark:bg-emerald-500"
-  return "bg-emerald-600 dark:bg-emerald-400"
+  if (total <= 15) return "bg-primary/20 dark:bg-primary/30"
+  if (total <= 30) return "bg-primary/40 dark:bg-primary/50"
+  if (total <= 60) return "bg-primary/60 dark:bg-primary/60"
+  if (total <= 120) return "bg-primary/80 dark:bg-primary/70"
+  return "bg-primary dark:bg-primary/80"
 }
 
 export function StreakCalendar() {
@@ -150,11 +150,11 @@ export function StreakCalendar() {
         <div className="flex items-center gap-1 mt-3 text-[10px] text-muted-foreground">
           <span>少</span>
           <div className="w-3 h-3 rounded-sm bg-muted" />
-          <div className="w-3 h-3 rounded-sm bg-emerald-200 dark:bg-emerald-900" />
-          <div className="w-3 h-3 rounded-sm bg-emerald-300 dark:bg-emerald-700" />
-          <div className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-600" />
-          <div className="w-3 h-3 rounded-sm bg-emerald-500" />
-          <div className="w-3 h-3 rounded-sm bg-emerald-600 dark:bg-emerald-400" />
+          <div className="w-3 h-3 rounded-sm bg-primary/20 dark:bg-primary/30" />
+          <div className="w-3 h-3 rounded-sm bg-primary/40 dark:bg-primary/50" />
+          <div className="w-3 h-3 rounded-sm bg-primary/60" />
+          <div className="w-3 h-3 rounded-sm bg-primary/80 dark:bg-primary/70" />
+          <div className="w-3 h-3 rounded-sm bg-primary dark:bg-primary/80" />
           <span>多</span>
         </div>
       </div>

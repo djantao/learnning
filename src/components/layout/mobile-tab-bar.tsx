@@ -16,7 +16,7 @@ export function MobileTabBar() {
   const pathname = usePathname()
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-t border-[#E5E5EA] dark:border-white/8 pb-[env(safe-area-inset-bottom,0px)] h-[calc(3.25rem+env(safe-area-inset-bottom,0px))]">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around bg-card/90 backdrop-blur-xl border-t border-border pb-[env(safe-area-inset-bottom,0px)] h-[calc(3.25rem+env(safe-area-inset-bottom,0px))]">
       {tabs.map((tab) => {
         const isActive = (tab as any).exact
           ? pathname === tab.href
@@ -27,9 +27,7 @@ export function MobileTabBar() {
             href={tab.href}
             className={cn(
               "flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 transition-colors",
-              isActive
-                ? "text-[#007AFF] dark:text-[#0A84FF]"
-                : "text-[#86868B] dark:text-[#98989D]"
+              isActive ? "text-primary" : "text-muted-foreground"
             )}
           >
             <tab.icon className="h-6 w-6" strokeWidth={isActive ? 2.5 : 2} />
@@ -37,12 +35,9 @@ export function MobileTabBar() {
           </Link>
         )
       })}
-      {/* 更多 → 触发侧边抽屉 */}
       <button
-        onClick={() => {
-          document.getElementById("mobile-menu-btn")?.click()
-        }}
-        className="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-[#86868B] dark:text-[#98989D]"
+        onClick={() => { document.getElementById("mobile-menu-btn")?.click() }}
+        className="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-muted-foreground"
       >
         <Ellipsis className="h-6 w-6" strokeWidth={2} />
         <span className="text-[10px] font-medium">更多</span>

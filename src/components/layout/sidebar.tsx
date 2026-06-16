@@ -43,37 +43,46 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="hidden lg:flex w-16 flex-col items-center bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-xl py-4 gap-1 shrink-0 shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.04)]">
+    <aside className="hidden lg:flex w-16 flex-col items-center bg-sidebar backdrop-blur-xl py-4 gap-1 shrink-0 border-r border-sidebar-border">
+      {/* Logo — quiet forge mark */}
       <Tooltip>
-        <TooltipTrigger render={<Link href="/" className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">MF</Link>} />
+        <TooltipTrigger render={
+          <Link href="/" className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm transition-transform hover:scale-105 active:scale-95">
+            MF
+          </Link>
+        } />
         <TooltipContent side="right">MindForge</TooltipContent>
       </Tooltip>
+
+      {/* Navigation items */}
       {navItems.map((item) => {
-          const isActive = (item as any).exact
-            ? pathname === item.href
-            : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"))
-          return (
-        <Tooltip key={item.href}>
-          <TooltipTrigger
-            render={
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200",
-                  isActive
-                    ? "bg-[#007AFF]/10 text-[#007AFF] dark:bg-[#0A84FF]/15 dark:text-[#0A84FF]"
-                    : "text-[#86868B] hover:bg-black/5 hover:text-[#1D1D1F] dark:text-[#98989D] dark:hover:bg-white/8 dark:hover:text-[#F5F5F7]"
-                )}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="sr-only">{item.label}</span>
-              </Link>
-            }
-          />
-          <TooltipContent side="right">{item.label}</TooltipContent>
-        </Tooltip>
-          )
-        })}
+        const isActive = (item as any).exact
+          ? pathname === item.href
+          : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"))
+        return (
+          <Tooltip key={item.href}>
+            <TooltipTrigger
+              render={
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" strokeWidth={isActive ? 2.25 : 1.75} />
+                  <span className="sr-only">{item.label}</span>
+                </Link>
+              }
+            />
+            <TooltipContent side="right">{item.label}</TooltipContent>
+          </Tooltip>
+        )
+      })}
+
+      {/* Bottom items */}
       <div className="mt-auto flex flex-col gap-1">
         {bottomItems.map((item) => (
           <Tooltip key={item.href}>
@@ -84,11 +93,11 @@ export function Sidebar() {
                   className={cn(
                     "flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200",
                     pathname === item.href
-                      ? "bg-[#007AFF]/10 text-[#007AFF] dark:bg-[#0A84FF]/15 dark:text-[#0A84FF]"
-                      : "text-[#86868B] hover:bg-black/5 hover:text-[#1D1D1F] dark:text-[#98989D] dark:hover:bg-white/8 dark:hover:text-[#F5F5F7]"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <item.icon className="h-5 w-5" strokeWidth={pathname === item.href ? 2.25 : 1.75} />
                   <span className="sr-only">{item.label}</span>
                 </Link>
               }

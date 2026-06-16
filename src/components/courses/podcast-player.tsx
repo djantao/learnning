@@ -215,7 +215,7 @@ export function PodcastPlayer({ knowledgePointId }: { knowledgePointId: string }
           {segments.map((seg, i) => (
             <span key={i} className={`text-[10px] w-4 h-4 rounded-full flex items-center justify-center transition-colors ${
               i === currentIdx
-                ? seg.speaker === "小明" ? "bg-[#007AFF] text-white dark:bg-[#0A84FF]" : "bg-[#FF375F] text-white dark:bg-[#FF453A]"
+                ? seg.speaker === "小明" ? "bg-primary text-primary-foreground" : "bg-[var(--copper)] text-white"
                 : i < currentIdx ? "bg-muted text-muted-foreground" : "bg-muted/30 text-muted-foreground/30"
             }`}>{seg.speaker[0]}</span>
           ))}

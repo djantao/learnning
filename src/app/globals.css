@@ -4,6 +4,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* =============================================
+   MindForge "Quiet Forge" Design System
+   静锻 — 深沉青碧 × 温暖铜色 × 匠人质感
+   ============================================= */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -48,103 +53,256 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── Light Mode: Warm Stone + Jade Teal ── */
 :root {
-  /* Apple light palette */
-  --background: #F5F5F7;
-  --foreground: #1D1D1F;
+  /* Surface */
+  --background: #F6F5F4;
+  --foreground: #191817;
   --card: #FFFFFF;
-  --card-foreground: #1D1D1F;
+  --card-foreground: #191817;
   --popover: #FFFFFF;
-  --popover-foreground: #1D1D1F;
-  --primary: #007AFF;
+  --popover-foreground: #191817;
+
+  /* Primary: Deep Jade-Teal — 深沉青碧，静中有力 */
+  --primary: #1B6B5A;
   --primary-foreground: #FFFFFF;
-  --secondary: #F2F2F7;
-  --secondary-foreground: #1D1D1F;
-  --muted: #F2F2F7;
-  --muted-foreground: #86868B;
-  --accent: #F2F2F7;
-  --accent-foreground: #1D1D1F;
-  --destructive: #FF3B30;
-  --border: #E5E5EA;
-  --input: #E5E5EA;
-  --ring: #007AFF;
-  --chart-1: #007AFF;
-  --chart-2: #34C759;
-  --chart-3: #FF9500;
-  --chart-4: #FF3B30;
-  --chart-5: #AF52DE;
-  --radius: 0.75rem;
-  --sidebar: rgb(255 255 255 / 0.7);
-  --sidebar-foreground: #1D1D1F;
-  --sidebar-primary: #007AFF;
+
+  /* Secondary & Muted: Warm stone tones */
+  --secondary: #EFEDE9;
+  --secondary-foreground: #191817;
+  --muted: #F3F1ED;
+  --muted-foreground: #787570;
+  --accent: #F0EDE7;
+  --accent-foreground: #191817;
+
+  /* Semantic */
+  --destructive: #DC4A4A;
+  --destructive-foreground: #FFFFFF;
+  --border: #E8E4DE;
+  --input: #E8E4DE;
+  --ring: #1B6B5A;
+
+  /* Chart — jade-centric palette */
+  --chart-1: #1B6B5A;
+  --chart-2: #D4834A;
+  --chart-3: #5B8C5A;
+  --chart-4: #DC4A4A;
+  --chart-5: #7B6FAA;
+
+  /* Radius — slightly softer than Apple default */
+  --radius: 0.875rem;
+
+  /* Sidebar — translucent warm */
+  --sidebar: rgb(255 255 255 / 0.65);
+  --sidebar-foreground: #191817;
+  --sidebar-primary: #1B6B5A;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: rgb(0 0 0 / 0.05);
-  --sidebar-accent-foreground: #007AFF;
-  --sidebar-border: rgb(0 0 0 / 0.06);
-  --sidebar-ring: #007AFF;
+  --sidebar-accent: rgb(0 0 0 / 0.04);
+  --sidebar-accent-foreground: #1B6B5A;
+  --sidebar-border: rgb(0 0 0 / 0.05);
+  --sidebar-ring: #1B6B5A;
+
   /* Semantic tokens */
-  --semantic-success: #34C759;
-  --semantic-success-bg: #F0FFF4;
-  --semantic-warning: #FF9500;
-  --semantic-warning-bg: #FFF8F0;
-  --semantic-danger: #FF3B30;
+  --semantic-success: #4A9E6B;
+  --semantic-success-bg: #F0F8F2;
+  --semantic-warning: #D4834A;
+  --semantic-warning-bg: #FDF6F0;
+  --semantic-danger: #DC4A4A;
   --semantic-danger-bg: #FFF0F0;
-  --semantic-info: #007AFF;
-  --semantic-info-bg: #F0F7FF;
+  --semantic-info: #1B6B5A;
+  --semantic-info-bg: #F0F7F5;
+
+  /* Copper accent — 暖铜色，用于"火花"瞬间 */
+  --copper: #D4834A;
+  --copper-light: #F0C8A0;
+  --copper-glow: rgba(212, 131, 74, 0.25);
+
+  /* Shadow system — warm, layered */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
+/* ── Dark Mode: Warm Dark + Glowing Jade ── */
 .dark {
-  /* Apple dark palette */
-  --background: #1C1C1E;
-  --foreground: #F5F5F7;
-  --card: #2C2C2E;
-  --card-foreground: #F5F5F7;
-  --popover: #2C2C2E;
-  --popover-foreground: #F5F5F7;
-  --primary: #0A84FF;
-  --primary-foreground: #FFFFFF;
-  --secondary: #3A3A3C;
-  --secondary-foreground: #F5F5F7;
-  --muted: #3A3A3C;
-  --muted-foreground: #98989D;
-  --accent: #3A3A3C;
-  --accent-foreground: #F5F5F7;
-  --destructive: #FF453A;
-  --border: rgb(255 255 255 / 0.1);
-  --input: rgb(255 255 255 / 0.15);
-  --ring: #0A84FF;
-  --chart-1: #0A84FF;
-  --chart-2: #30D158;
-  --chart-3: #FF9F0A;
-  --chart-4: #FF453A;
-  --chart-5: #BF5AF2;
-  --sidebar: rgb(28 28 30 / 0.7);
-  --sidebar-foreground: #F5F5F7;
-  --sidebar-primary: #0A84FF;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: rgb(255 255 255 / 0.08);
-  --sidebar-accent-foreground: #0A84FF;
-  --sidebar-border: rgb(255 255 255 / 0.08);
-  --sidebar-ring: #0A84FF;
-  /* Semantic tokens — dark */
-  --semantic-success: #30D158;
-  --semantic-success-bg: rgba(48,209,88,0.12);
-  --semantic-warning: #FF9F0A;
-  --semantic-warning-bg: rgba(255,159,10,0.12);
-  --semantic-danger: #FF453A;
-  --semantic-danger-bg: rgba(255,69,58,0.12);
-  --semantic-info: #0A84FF;
-  --semantic-info-bg: rgba(10,132,255,0.12);
+  --background: #191715;
+  --foreground: #F0EDE8;
+  --card: #24211D;
+  --card-foreground: #F0EDE8;
+  --popover: #24211D;
+  --popover-foreground: #F0EDE8;
+
+  /* Primary glows brighter in dark */
+  --primary: #4DAD95;
+  --primary-foreground: #0A1F19;
+
+  --secondary: #2D2A26;
+  --secondary-foreground: #F0EDE8;
+  --muted: #2D2A26;
+  --muted-foreground: #9E9B95;
+  --accent: #2D2A26;
+  --accent-foreground: #F0EDE8;
+
+  --destructive: #F06050;
+  --destructive-foreground: #1A0A08;
+  --border: rgba(255 255 255 / 0.08);
+  --input: rgba(255 255 255 / 0.12);
+  --ring: #4DAD95;
+
+  --chart-1: #4DAD95;
+  --chart-2: #E89868;
+  --chart-3: #6BAE6A;
+  --chart-4: #F06050;
+  --chart-5: #9B8FC0;
+
+  --sidebar: rgb(25 23 21 / 0.65);
+  --sidebar-foreground: #F0EDE8;
+  --sidebar-primary: #4DAD95;
+  --sidebar-primary-foreground: #0A1F19;
+  --sidebar-accent: rgba(255 255 255 / 0.06);
+  --sidebar-accent-foreground: #4DAD95;
+  --sidebar-border: rgba(255 255 255 / 0.06);
+  --sidebar-ring: #4DAD95;
+
+  /* Semantic — dark */
+  --semantic-success: #5AB87A;
+  --semantic-success-bg: rgba(90, 184, 122, 0.12);
+  --semantic-warning: #E89868;
+  --semantic-warning-bg: rgba(232, 152, 104, 0.12);
+  --semantic-danger: #F06050;
+  --semantic-danger-bg: rgba(240, 96, 80, 0.12);
+  --semantic-info: #4DAD95;
+  --semantic-info-bg: rgba(77, 173, 149, 0.12);
+
+  --copper: #E89868;
+  --copper-light: #F0C8A0;
+  --copper-glow: rgba(232, 152, 104, 0.2);
 }
 
+/* ── Animations ── */
+@keyframes forge-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--copper-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+@keyframes forge-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+/* ── Utility classes ── */
+.forge-glow {
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+.forge-glow:hover,
+.forge-glow:focus-visible {
+  box-shadow: 0 0 0 4px var(--copper-glow);
+  border-color: var(--copper);
+}
+
+.forge-shimmer {
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 30%,
+    var(--copper-glow) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.5s ease-in-out infinite;
+}
+
+/* ── Scrollbar styling ── */
+@media (hover: hover) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+}
+
+/* ── Base ── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
   html {
     @apply font-sans;
   }
+
+  /* Selection */
+  ::selection {
+    background-color: rgba(27, 107, 90, 0.15);
+    color: var(--foreground);
+  }
+  .dark ::selection {
+    background-color: rgba(77, 173, 149, 0.25);
+  }
+
+  /* Focus visible — warm copper ring */
+  :focus-visible {
+    outline: 2px solid var(--copper);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* ── Card refinements ── */
+.card-elevated {
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.card-elevated:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+/* ── Gradient text utility ── */
+.text-gradient-forge {
+  background: linear-gradient(135deg, var(--primary), var(--copper));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

@@ -8,7 +8,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto bg-[#F5F5F7] dark:bg-[#1C1C1E] p-3 sm:p-4 md:p-6 pb-[calc(1rem+3.25rem+env(safe-area-inset-bottom,0px))] lg:pb-6">
+        <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-5 md:p-8 pb-[calc(1.5rem+3.25rem+env(safe-area-inset-bottom,0px))] lg:pb-8">
           {children}
         </main>
       </div>
