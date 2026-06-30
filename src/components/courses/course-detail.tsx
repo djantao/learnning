@@ -19,6 +19,7 @@ import Link from "next/link"
 
 interface KP {
   id: string; title: string; status: string; mastery: number; sortOrder: number
+  estimatedMinutes: number | null
 }
 
 interface Module {
@@ -248,6 +249,9 @@ export function CourseDetail({ course, stats }: { course: Course; stats?: Course
                 <div className="flex items-center gap-2 min-w-0">
                   <Play className="h-3 w-3 shrink-0 text-primary" />
                   <span className="text-sm truncate" title={kp.title}>{kp.title}</span>
+                  {kp.estimatedMinutes != null && kp.estimatedMinutes > 0 && (
+                    <span className="text-[10px] text-muted-foreground">~{kp.estimatedMinutes}分钟</span>
+                  )}
                 </div>
                 {(() => {
                   const m = masteryLabel(kp.mastery)

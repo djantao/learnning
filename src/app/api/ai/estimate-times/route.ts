@@ -19,21 +19,28 @@ export async function POST(req: Request) {
     where: { courseId },
     include: {
       childModules: { select: { id: true, title: true, estimatedMinutes: true } },
-      knowledgePoints: { select: { id: true } },
+      knowledgePoints: { select: { id: true, title: true, estimatedMinutes: true } },
     },
   })
 
-  const needsEstimate = allModules.filter((m) => m.estimatedMinutes == null)
+  const needsEstimateModules = allModules.filter((m) => m.estimatedMinutes == null)
+  const needsEstimateKPs = allModules.flatMap((m) =>
+    m.knowledgePoints.filter((kp) => kp.estimatedMinutes == null)
+  )
 
-  if (needsEstimate.length === 0) {
-    return NextResponse.json({ message: "所有模块已有预估时长", count: 0 })
+  if (needsEstimateModules.length === 0 && needsEstimateKPs.length === 0) {
+    return NextResponse.json({ message: "所有模块和知识点已有预估时长", count: 0 })
   }
 
-  const moduleList = needsEstimate.map((m) =>
-    `- ${m.title}（${m.knowledgePoints.length} 个知识点）`
-  ).join("\n")
+  const moduleList = needsEstimateModules.map((m) => {
+    const kpLines = m.knowledgePoints
+      .filter((kp) => kp.estimatedMinutes == null)
+      .map((kp) => `    - ${kp.title}`)
+      .join("\n")
+    return `- ${m.title}（${m.knowledgePoints.length} 个知识点）${kpLines ? "\n" + kpLines : ""}`
+  }).join("\n")
 
-  const prompt = `你是课程时长评估专家。请为以下模块估算学习时长（分钟）。
+  const prompt = `你是课程时长评估专家。请为以下模块及其知识点估算学习时长（分钟）。
 
 课程：${course.title}
 
@@ -45,9 +52,13 @@ ${moduleList}
 - 中等模块（3-4个知识点）：20-40分钟
 - 复杂模块（5+个知识点）：40-60分钟
 - 实践/项目模块：额外加10-20分钟
+- 单个简单知识点：5-10分钟
+- 单个中等知识点：10-20分钟
+- 单个复杂知识点：20-30分钟
+- 模块总时长应约等于其下所有知识点时长之和（允许±20%误差）
 
-输出纯 JSON 对象（不要markdown代码块），key是模块标题，value是分钟数（整数）：
-{"模块标题1": 30, "模块标题2": 45, ...}`
+输出纯 JSON 对象（不要markdown代码块），格式如下：
+{"模块标题1": {"minutes": 30, "knowledgePoints": {"知识点标题1": 10, "知识点标题2": 20}}, "模块标题2": {"minutes": 45, "knowledgePoints": {"知识点标题3": 45}}, ...}`
 
   try {
     const result = await chatCompletion({
@@ -63,32 +74,61 @@ ${moduleList}
       return NextResponse.json({ error: "AI 返回格式异常", raw: text.slice(0, 200) }, { status: 500 })
     }
 
-    let estimates: Record<string, number>
+    let estimates: Record<string, { minutes?: number; knowledgePoints?: Record<string, number> }>
     try { estimates = JSON.parse(jsonMatch[0]) } catch {
       return NextResponse.json({ error: "JSON 解析失败", raw: text.slice(0, 200) }, { status: 500 })
     }
 
-    let updated = 0
-    let fallback = 0
-    for (const mod of needsEstimate) {
-      const minutes = estimates[mod.title]
-      if (typeof minutes === "number" && minutes > 0) {
+    let updatedModules = 0
+    let fallbackModules = 0
+    let updatedKPs = 0
+    let fallbackKPs = 0
+
+    for (const mod of needsEstimateModules) {
+      const modEstimate = estimates[mod.title]
+      const moduleMinutes = typeof modEstimate === "object" ? modEstimate?.minutes : undefined
+
+      if (typeof moduleMinutes === "number" && moduleMinutes > 0) {
         await prisma.module.update({
           where: { id: mod.id },
-          data: { estimatedMinutes: Math.round(minutes) },
+          data: { estimatedMinutes: Math.round(moduleMinutes) },
         })
-        updated++
+        updatedModules++
       } else {
         const fb = Math.max(10, mod.knowledgePoints.length * 15)
         await prisma.module.update({
           where: { id: mod.id },
           data: { estimatedMinutes: fb },
         })
-        fallback++
+        fallbackModules++
+      }
+
+      // 更新知识点时长
+      const kpEstimates = typeof modEstimate === "object" ? modEstimate?.knowledgePoints : undefined
+      for (const kp of mod.knowledgePoints) {
+        if (kp.estimatedMinutes != null) continue // 已有估算则跳过
+        const kpMinutes = kpEstimates?.[kp.title]
+        if (typeof kpMinutes === "number" && kpMinutes > 0) {
+          await prisma.knowledgePoint.update({
+            where: { id: kp.id },
+            data: { estimatedMinutes: Math.round(kpMinutes) },
+          })
+          updatedKPs++
+        } else {
+          const kpFb = Math.max(5, 15)
+          await prisma.knowledgePoint.update({
+            where: { id: kp.id },
+            data: { estimatedMinutes: kpFb },
+          })
+          fallbackKPs++
+        }
       }
     }
 
-    return NextResponse.json({ message: `已为 ${updated} 个模块设置时长${fallback > 0 ? `，${fallback} 个按KP数推算` : ""}`, count: updated + fallback })
+    return NextResponse.json({
+      message: `已为 ${updatedModules} 个模块、${updatedKPs} 个知识点设置时长${fallbackModules > 0 || fallbackKPs > 0 ? `，其中 ${fallbackModules} 个模块、${fallbackKPs} 个知识点按默认值推算` : ""}`,
+      count: updatedModules + fallbackModules + updatedKPs + fallbackKPs,
+    })
   } catch (error) {
     console.error("estimate-times error:", error)
     return NextResponse.json({ error: "估算失败" }, { status: 500 })
