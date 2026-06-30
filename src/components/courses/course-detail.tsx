@@ -60,9 +60,8 @@ function totalModuleMinutes(mod: Module): number {
   return total
 }
 
-export function CourseDetail({ course: initialCourse, stats }: { course: Course; stats?: CourseStats }) {
+export function CourseDetail({ course, stats }: { course: Course; stats?: CourseStats }) {
   const router = useRouter()
-  const [course] = useState(initialCourse)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [addingModule, setAddingModule] = useState<string | null>(null)
   const [moduleName, setModuleName] = useState("")
