@@ -166,7 +166,11 @@ async function buildCurriculumContext(
   // === DYNAMIC CONTENT (changes per call — full price) ===
   const total = modules.filter((m) => !m.parentModuleId).length
   const done = modules.filter((m) => !m.parentModuleId && m.status === "completed").length
-  parts.push(`\n## Course: ${course.title} (${done}/${total} done) | Module: ${kp.module.title}`)
+  const versionTag = course.version ? ` [v${course.version}]` : ""
+  parts.push(`\n## Course: ${course.title}${versionTag} (${done}/${total} done) | Module: ${kp.module.title}`)
+  if (course.version) {
+    parts.push(`**VERSION LOCK**: 本课程严格限定为 ${course.title} ${course.version} 版本。你回答的所有内容、API、概念、配置都必须基于 ${course.version} 版本。绝对禁止提及或混入其他版本的特性、变更或废弃内容。如果用户问到其他版本的内容，礼貌地告知用户本课程只覆盖 ${course.version} 版本。`)
+  }
 
   // Compact module map
   const top = modules.filter((m) => !m.parentModuleId)

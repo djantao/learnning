@@ -8,15 +8,20 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await req.json()
-  const { rawText, mode, topicName } = body
+  const { rawText, mode, topicName, version } = body
 
   let prompt: string
 
   if (mode === "topic" && topicName && topicName.trim().length >= 2) {
     // Topic mode: generate complete knowledge system from a topic name
+    const versionConstraint = version
+      ? `\n【版本约束】本课程严格限定为 ${topicName} ${version} 版本。所有内容、API、概念、配置都必须基于 ${version} 版本，绝对禁止混入其他版本的特性或变更。如果某个知识点在 ${version} 版本中不存在，则不要包含它。`
+      : ""
+
     prompt = `你是一位资深的课程设计专家。请为以下主题生成一份完整的体系化学习课程。
 
-主题：${topicName}
+主题：${topicName}${version ? `（版本：${version}）` : ""}
+${versionConstraint}
 
 要求：
 1. 生成 5-8 个模块，覆盖从入门基础到进阶实战的完整学习路径
@@ -31,6 +36,10 @@ export async function POST(req: Request) {
 {"title":"课程标题","description":"1-2句话概括课程定位和目标人群","modules":[{"title":"模块名","description":"学习目标","estimatedMinutes":30,"knowledgePoints":[{"title":"知识点标题","content":"1-2句简要说明"}]}]}`
   } else if (rawText && rawText.trim().length >= 10) {
     // Outline mode: parse user-provided syllabus
+    const versionConstraint = version
+      ? `\n## 版本约束\n本课程严格限定为 ${version} 版本。所有内容、API、概念、配置都必须基于 ${version} 版本，绝对禁止混入其他版本的特性或变更。`
+      : ""
+
     prompt = `你是一个课程结构解析器。请严格按照用户提供的大纲生成课程JSON。
 
 ## 核心规则（优先级最高）
@@ -38,6 +47,7 @@ export async function POST(req: Request) {
 2. **保留原始术语**：模块名、知识点标题尽量使用用户原文中的表述，不要改写。
 3. **标题提取**：从大纲内容推断课程标题。如果大纲明确写了课程名，直接使用。
 4. **description写1-2句话概括课程定位**。
+${versionConstraint}
 
 ## 解析规则
 - 表格：第一列=模块名，中间列=知识点列表（按<br>或编号拆分），最后一列=学习目标
@@ -110,6 +120,7 @@ ${rawText.slice(0, 4000)}`
         userId: session.user.id,
         title,
         description: description || null,
+        version: version || null,
         icon: "📚",
       },
     })

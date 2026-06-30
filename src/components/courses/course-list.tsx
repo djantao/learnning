@@ -44,6 +44,13 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
   const [bookLoading, setBookLoading] = useState(false)
   const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set())
 
+  // Version detection state
+  const [detectedVersions, setDetectedVersions] = useState<string[]>([])
+  const [versionRecommendation, setVersionRecommendation] = useState("")
+  const [selectedVersion, setSelectedVersion] = useState<string | null>(null)
+  const [detectingVersions, setDetectingVersions] = useState(false)
+  const [showVersionPicker, setShowVersionPicker] = useState(false)
+
   async function createCourse() {
     if (!newTitle.trim()) return
     const res = await fetch("/api/courses", {
@@ -148,7 +155,7 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
     setAiLoading(true)
     try {
       const body = aiMode === "topic"
-        ? { mode: "topic", topicName: aiTopicName.trim() }
+        ? { mode: "topic", topicName: aiTopicName.trim(), version: selectedVersion }
         : aiMode === "book"
           ? { rawText: buildBookOutlineText() }
           : { rawText: aiText }
@@ -162,6 +169,7 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
         setCourses([data.course, ...courses])
         setAiText("")
         setAiTopicName("")
+        resetVersionState()
         setBookTitle("")
         setBookOutline(null)
         setSelectedChapters(new Set())
@@ -181,6 +189,43 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
     setBookTitle("")
     setBookOutline(null)
     setSelectedChapters(new Set())
+  }
+
+  function resetVersionState() {
+    setDetectedVersions([])
+    setVersionRecommendation("")
+    setSelectedVersion(null)
+    setShowVersionPicker(false)
+  }
+
+  async function detectVersions() {
+    const topic = aiTopicName.trim()
+    if (!topic || topic.length < 2) {
+      toast.error("请输入课程主题")
+      return
+    }
+    setDetectingVersions(true)
+    try {
+      const res = await fetch("/api/ai/detect-versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topicName: topic }),
+      })
+      const data = await res.json()
+      if (data.hasVersions && data.versions.length > 0) {
+        setDetectedVersions(data.versions)
+        setVersionRecommendation(data.recommendation || "")
+        setShowVersionPicker(true)
+        toast.success(`检测到 ${data.versions.length} 个版本`)
+      } else {
+        setDetectedVersions([])
+        setShowVersionPicker(false)
+        toast.info("该主题无明确版本区分，将生成通用课程")
+      }
+    } catch {
+      toast.error("版本检测失败")
+    }
+    setDetectingVersions(false)
   }
 
   return (
@@ -230,7 +275,7 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={aiOpen} onOpenChange={(v) => { setAiOpen(v); if (!v) resetBookState() }}>
+        <Dialog open={aiOpen} onOpenChange={(v) => { setAiOpen(v); if (!v) { resetBookState(); resetVersionState() } }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -266,12 +311,57 @@ export function CourseList({ initialCourses }: { initialCourses: Course[] }) {
 
                 <TabsContent value="topic" className="pt-4 space-y-3">
                   <p className="text-sm text-muted-foreground">输入你想学习的主题，AI 将自动构建完整的知识体系，覆盖从入门到进阶。</p>
-                  <Input
-                    placeholder="例如：Flink、Kubernetes、Rust、机器学习、Doris..."
-                    value={aiTopicName}
-                    onChange={(e) => setAiTopicName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && aiGenerate()}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="例如：Flink、Kubernetes、Rust、机器学习、Doris..."
+                      value={aiTopicName}
+                      onChange={(e) => { setAiTopicName(e.target.value); resetVersionState() }}
+                      onKeyDown={(e) => e.key === "Enter" && aiGenerate()}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={detectVersions}
+                      disabled={detectingVersions || !aiTopicName.trim() || aiTopicName.trim().length < 2}
+                    >
+                      {detectingVersions ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      检测版本
+                    </Button>
+                  </div>
+
+                  {showVersionPicker && detectedVersions.length > 0 && (
+                    <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                      <p className="text-sm font-medium">
+                        检测到以下版本 {versionRecommendation && `· 推荐：${versionRecommendation}`}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant={selectedVersion === null ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setSelectedVersion(null)}
+                        >
+                          不指定版本
+                        </Button>
+                        {detectedVersions.map((v) => (
+                          <Button
+                            key={v}
+                            variant={selectedVersion === v ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setSelectedVersion(v)}
+                          >
+                            {v}
+                          </Button>
+                        ))}
+                      </div>
+                      {selectedVersion && (
+                        <p className="text-xs text-primary">
+                          已选择：{selectedVersion}，AI 将严格按此版本生成内容
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="book" className="pt-4 space-y-4">
