@@ -55,7 +55,7 @@ export type AITask =
   | "generate_mindmap" | "generate_podcast" | "generate_diagram"
   | "generate_article" | "generate_pretest" | "generate_book_outline"
   | "summarize" | "evaluate_answers" | "detect_blindspots"
-  | "compare_recall" | "estimate_times"
+  | "compare_recall" | "estimate_times" | "detect_versions"
 
 export function routeProvider(task: AITask): ProviderKey {
   switch (task) {
