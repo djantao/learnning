@@ -289,6 +289,28 @@
   }
 }
 
+/* ── Mobile chat word-break fix ── */
+.prose {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+.prose p,
+.prose li,
+.prose td,
+.prose th,
+.prose code,
+.prose pre {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+.prose pre {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+.prose code {
+  white-space: normal !important;
+}
+
 /* ── Card refinements ── */
 .card-elevated {
   box-shadow: var(--shadow-md);

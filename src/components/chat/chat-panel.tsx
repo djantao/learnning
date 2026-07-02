@@ -278,7 +278,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted"
                   }`}
-                  style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                  style={{ overflowWrap: 'anywhere', wordBreak: 'break-word', overflowX: 'hidden' }}
                 >
                   {msg.role === "user" ? (
                     <div className="whitespace-pre-wrap" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.content}</div>
