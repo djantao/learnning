@@ -247,7 +247,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
       )}
 
       {/* Chat Area */}
-      <div className={cn("flex flex-1 flex-col", borderless ? "" : "rounded-lg border bg-card")}>
+      <div className={cn("flex flex-1 flex-col min-w-0", borderless ? "" : "rounded-lg border bg-card")}>
         {/* Context Indicator */}
         <div className="flex flex-wrap items-center gap-1.5 border-b px-3 py-2">
           <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
@@ -270,19 +270,20 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
             {messages.map((msg, i) => (
               <div
                 key={i}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex min-w-0 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`${isCurriculumMode ? "max-w-[100%] sm:max-w-[92%]" : "max-w-[90%] sm:max-w-[80%]"} rounded-lg px-3 sm:px-4 py-2 text-sm break-words overflow-wrap-anywhere min-w-0 ${
+                  className={`${isCurriculumMode ? "max-w-[100%] sm:max-w-[92%]" : "max-w-[90%] sm:max-w-[80%]"} rounded-lg px-3 sm:px-4 py-2 text-sm min-w-0 ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted"
                   }`}
+                  style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                 >
                   {msg.role === "user" ? (
-                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                    <div className="whitespace-pre-wrap" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.content}</div>
                   ) : (
-                    msg.content ? <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:break-words [&_li]:break-words [&_code]:break-all [&_pre]:overflow-x-auto" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} /> : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
+                    msg.content ? <div className="prose prose-sm dark:prose-invert max-w-none" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }} dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} /> : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
                   )}
                   {msg.role === "assistant" && msg.content && !msg.content.startsWith("你好！我是") && (
                     <button

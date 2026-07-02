@@ -326,7 +326,7 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
         {rightPanel === "notes" ? (
           <LearningNotes knowledgePointId={kp.id} />
         ) : (
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-hidden flex flex-col min-w-0">
             <ChatPanel conversations={[]} courseId={kp.module.courseId} knowledgePointId={kp.id} kpTitle={kp.title} />
           </div>
         )}
@@ -339,7 +339,7 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
             <span className="text-sm font-medium">AI 老师</span>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setChatOpen(false)}><X className="h-4 w-4" /></Button>
           </div>
-          <div className="flex-1 overflow-hidden pb-[env(safe-area-inset-bottom,0px)]">
+          <div className="flex-1 overflow-hidden min-w-0 pb-[env(safe-area-inset-bottom,0px)]">
             <ChatPanel conversations={[]} courseId={kp.module.courseId} knowledgePointId={kp.id} kpTitle={kp.title} />
           </div>
         </div>
