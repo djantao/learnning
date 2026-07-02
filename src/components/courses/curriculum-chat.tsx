@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChatPanel } from "@/components/chat/chat-panel"
+import { FloatingChatWindow } from "@/components/chat/floating-chat-window"
 import { LearningNotes } from "@/components/notes/learning-notes"
 import { BlindRecallOverlay } from "@/components/recall/blind-recall-overlay"
 import type { RecallResult } from "@/components/recall/blind-recall-overlay"
@@ -15,7 +16,7 @@ import { MindMapView } from "@/components/courses/mindmap-view"
 import { XpCelebration } from "@/components/courses/xp-celebration"
 import { XP_PER_KP_MASTERED, xpToLevel, getLevelTitle } from "@/lib/gamification"
 import { toast } from "sonner"
-import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch, Users, PenLine, StickyNote } from "lucide-react"
+import { Star, ArrowLeft, ArrowRight, MessageCircle, X, ChevronRight, Trophy, FileText, Loader2, GitBranch, Users, PenLine, StickyNote, Move } from "lucide-react"
 import Link from "next/link"
 
 interface KpData {
@@ -33,6 +34,7 @@ interface KpData {
 export function CurriculumChat({ kp }: { kp: KpData }) {
   const [mastery, setMastery] = useState(kp.mastery)
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatMode, setChatMode] = useState<"sidebar" | "floating">("sidebar")
   const [rightPanel, setRightPanel] = useState<"notes" | "chat">("notes")
   const [saving, setSaving] = useState(false)
   const [totalXp, setTotalXp] = useState(0)
@@ -150,20 +152,41 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
                 <Users className="h-3.5 w-3.5" />教练问答
               </Button>
             </Link>
-            {/* Desktop: toggle right panel chat tab. Mobile: open overlay */}
-            <Button
-              variant={chatOpen || rightPanel === "chat" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => {
-                if (chatOpen) { setChatOpen(false); return }
-                if (rightPanel === "chat") { setRightPanel("notes"); return }
-                openChat()
-              }}
-              className="gap-1.5 text-xs hidden xl:inline-flex"
-            >
-              {rightPanel === "chat" ? <X className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
-              {rightPanel === "chat" ? "关闭" : "AI 老师"}
-            </Button>
+            {/* Desktop: toggle chat. Has two modes: sidebar and floating */}
+            <div className="hidden xl:flex items-center gap-1">
+              <Button
+                variant={(chatOpen || rightPanel === "chat") && chatMode === "sidebar" ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (chatMode !== "sidebar") {
+                    setChatMode("sidebar")
+                    setChatOpen(false)
+                    setRightPanel("chat")
+                    return
+                  }
+                  if (rightPanel === "chat") { setRightPanel("notes"); return }
+                  openChat()
+                }}
+                className="gap-1.5 text-xs"
+              >
+                {rightPanel === "chat" && chatMode === "sidebar" ? <X className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                {rightPanel === "chat" && chatMode === "sidebar" ? "关闭" : "AI 老师"}
+              </Button>
+              <Button
+                variant={chatMode === "floating" && chatOpen ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setChatMode("floating")
+                  if (rightPanel === "chat") setRightPanel("notes")
+                  setChatOpen(!chatOpen)
+                }}
+                className="gap-1.5 text-xs"
+                title="悬浮模式"
+              >
+                <Move className="h-3.5 w-3.5" />
+                悬浮
+              </Button>
+            </div>
             <Button
               variant={chatOpen ? "secondary" : "outline"}
               size="sm"
@@ -389,6 +412,16 @@ export function CurriculumChat({ kp }: { kp: KpData }) {
           <MindMapView moduleId={kp.module.id} />
         </DialogContent>
       </Dialog>
+
+      {/* Floating Chat Window */}
+      {chatMode === "floating" && chatOpen && (
+        <FloatingChatWindow
+          courseId={kp.module.courseId}
+          knowledgePointId={kp.id}
+          kpTitle={kp.title}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
     </div>
   )
 }

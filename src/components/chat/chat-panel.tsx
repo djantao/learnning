@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -27,9 +28,10 @@ interface ChatPanelProps {
   courseId?: string
   knowledgePointId?: string
   kpTitle?: string
+  borderless?: boolean
 }
 
-export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle }: ChatPanelProps) {
+export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, borderless }: ChatPanelProps) {
   const isCurriculumMode = !!(courseId && knowledgePointId)
 
   const [messages, setMessages] = useState<Message[]>([
@@ -245,7 +247,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle }
       )}
 
       {/* Chat Area */}
-      <div className="flex flex-1 flex-col rounded-lg border bg-card">
+      <div className={cn("flex flex-1 flex-col", borderless ? "" : "rounded-lg border bg-card")}>
         {/* Context Indicator */}
         <div className="flex items-center gap-2 border-b px-4 py-2">
           <Badge variant="outline" className="text-xs gap-1">
