@@ -212,7 +212,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
   }
 
   return (
-    <div className={`flex gap-4 ${isCurriculumMode ? "h-full" : "h-[calc(100vh-8rem)]"}`}>
+    <div className={`flex gap-4 w-full min-w-0 ${isCurriculumMode ? "h-full" : "h-[calc(100vh-8rem)]"}`}>
       {/* Conversation List — hidden in curriculum mode */}
       {!isCurriculumMode && (
       <div className="hidden w-56 shrink-0 lg:block">
@@ -265,7 +265,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4" ref={scrollRef}>
           <div className={`space-y-4 ${isCurriculumMode ? "" : "max-w-3xl mx-auto"}`}>
             {messages.map((msg, i) => (
               <div
@@ -273,16 +273,16 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`${isCurriculumMode ? "max-w-[98%] sm:max-w-[92%]" : "max-w-[90%] sm:max-w-[80%]"} rounded-lg px-3 sm:px-4 py-2 text-sm break-words ${
+                  className={`${isCurriculumMode ? "max-w-[100%] sm:max-w-[92%]" : "max-w-[90%] sm:max-w-[80%]"} rounded-lg px-3 sm:px-4 py-2 text-sm break-words overflow-wrap-anywhere min-w-0 ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted"
                   }`}
                 >
                   {msg.role === "user" ? (
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
                   ) : (
-                    msg.content ? <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} /> : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
+                    msg.content ? <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:break-words [&_li]:break-words [&_code]:break-all [&_pre]:overflow-x-auto" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} /> : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
                   )}
                   {msg.role === "assistant" && msg.content && !msg.content.startsWith("你好！我是") && (
                     <button
@@ -300,8 +300,8 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
         </div>
 
         {/* Input */}
-        <div className="border-t p-4">
-          <div className="flex gap-2 max-w-3xl mx-auto">
+        <div className="border-t p-3 sm:p-4">
+          <div className="flex gap-2">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
