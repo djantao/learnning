@@ -3,6 +3,14 @@ export function renderMarkdown(md: string): string {
 
   let html = md
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+  // Code blocks (```...```)
+  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+    const langLabel = lang ? `<div class="text-[10px] text-muted-foreground mb-1">${lang}</div>` : ""
+    return `<div class="my-2 rounded-md bg-muted/80 p-3 overflow-x-auto">${langLabel}<pre class="text-xs font-mono whitespace-pre"><code>${code.trim()}</code></pre></div>`
+  })
+
+  html = html
     .replace(/^#### (.+)$/gm, "<h4 class='text-base font-semibold mt-4 mb-2'>$1</h4>")
     .replace(/^### (.+)$/gm, "<h3 class='text-lg font-semibold mt-4 mb-2'>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2 class='text-xl font-bold mt-6 mb-3'>$1</h2>")

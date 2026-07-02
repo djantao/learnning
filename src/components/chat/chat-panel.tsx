@@ -249,16 +249,16 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
       {/* Chat Area */}
       <div className={cn("flex flex-1 flex-col", borderless ? "" : "rounded-lg border bg-card")}>
         {/* Context Indicator */}
-        <div className="flex items-center gap-2 border-b px-4 py-2">
-          <Badge variant="outline" className="text-xs gap-1">
+        <div className="flex flex-wrap items-center gap-1.5 border-b px-3 py-2">
+          <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
             <Sparkles className="h-3 w-3" />
             学习档案已加载
           </Badge>
-          <Badge variant="outline" className="text-xs gap-1">
+          <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
             <Brain className="h-3 w-3" />
             指令锚点已注入
           </Badge>
-          <Badge variant="outline" className="text-xs gap-1 text-muted-foreground">
+          <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground shrink-0">
             <FileText className="h-3 w-3" />
             AI 记忆已激活
           </Badge>
@@ -273,7 +273,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`${isCurriculumMode ? "max-w-[92%]" : "max-w-[80%]"} rounded-lg px-4 py-2 text-sm ${
+                  className={`${isCurriculumMode ? "max-w-[98%] sm:max-w-[92%]" : "max-w-[90%] sm:max-w-[80%]"} rounded-lg px-3 sm:px-4 py-2 text-sm break-words ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted"
