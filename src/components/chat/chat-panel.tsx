@@ -51,7 +51,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
     lastReviewedAt?: string
     sm2NextReview?: string
     isReviewDue: boolean
-    daysSinceReviewed?: number
+    daysSinceReviewed?: number | null
   } | null>(null)
   const recognitionRef = useRef<any>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
