@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth"
 import { chatCompletion } from "@/lib/ai/client"
 import { prisma } from "@/lib/db"
+import { trackActivity } from "@/lib/activity"
+import { recomputeForKnowledgePoint } from "@/lib/curriculum"
 import { NextResponse } from "next/server"
 
 interface QuestionResult {
@@ -96,6 +98,29 @@ ${qaText}
         questionResults: JSON.stringify(evaluation.details),
       },
     })
+
+    // aiScore >= 4 → 提升对应 KP 的 mastery
+    if (suggestedScore >= 4) {
+      const kpCurrent = await prisma.knowledgePoint.findUnique({
+        where: { id: knowledgePointId },
+        select: { mastery: true, status: true, completedAt: true },
+      })
+      if (kpCurrent) {
+        const newMastery = Math.min(5, Math.max(kpCurrent.mastery, suggestedScore))
+        if (newMastery > kpCurrent.mastery) {
+          await prisma.knowledgePoint.update({
+            where: { id: knowledgePointId },
+            data: {
+              mastery: newMastery,
+              status: newMastery >= 4 ? "mastered" : "in_progress",
+              completedAt: newMastery >= 4 && !kpCurrent.completedAt ? new Date() : undefined,
+            },
+          })
+          recomputeForKnowledgePoint(knowledgePointId).catch(() => {})
+          trackActivity(session.user.id, { kpsCompleted: 1, studyMinutes: 5 }).catch(() => {})
+        }
+      }
+    }
 
     return NextResponse.json({
       feedback: evaluation.feedback,

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { chatCompletion } from "@/lib/ai/client"
 import { quizEvalPrompt } from "@/lib/ai/skills/quiz-generator"
 import { recomputeForKnowledgePoint } from "@/lib/curriculum"
+import { trackActivity } from "@/lib/activity"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
 
@@ -61,6 +62,7 @@ export async function PATCH(
     }
 
     // 按诊断更新 KP mastery：掌握=5, 熟练=4, 薄弱=2
+    let kpsCompletedCount = 0
     for (const item of [...diagnosis.strong, ...diagnosis.medium, ...diagnosis.weak]) {
       const kpId = item.kpId
       if (!kpId) continue
@@ -69,14 +71,28 @@ export async function PATCH(
       else if (diagnosis.medium.some((s: any) => s.kpId === kpId)) newMastery = 4
       else if (diagnosis.weak.some((s: any) => s.kpId === kpId)) newMastery = 2
 
-      const kp = await prisma.knowledgePoint.findUnique({ where: { id: kpId }, select: { mastery: true } })
+      const kp = await prisma.knowledgePoint.findUnique({
+        where: { id: kpId },
+        select: { mastery: true, status: true, completedAt: true },
+      })
       if (kp && newMastery > kp.mastery) {
         await prisma.knowledgePoint.update({
           where: { id: kpId },
-          data: { mastery: newMastery },
+          data: {
+            mastery: newMastery,
+            status: newMastery >= 4 ? "mastered" : "in_progress",
+            completedAt: newMastery >= 4 && !kp.completedAt ? new Date() : undefined,
+          },
         })
         await recomputeForKnowledgePoint(kpId)
+        if (newMastery >= 4 && kp.status !== "mastered") {
+          kpsCompletedCount++
+        }
       }
+    }
+
+    if (kpsCompletedCount > 0) {
+      trackActivity(session.user.id, { kpsCompleted: kpsCompletedCount, studyMinutes: kpsCompletedCount * 5 }).catch(() => {})
     }
 
     await prisma.moduleQuiz.update({
