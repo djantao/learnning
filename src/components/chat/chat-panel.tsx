@@ -45,12 +45,45 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
   const [convId, setConvId] = useState<string | null>(null)
   const [convList, setConvList] = useState(conversations)
   const [listening, setListening] = useState(false)
+  const [reviewStatus, setReviewStatus] = useState<{
+    mastery: number
+    status: string
+    lastReviewedAt?: string
+    sm2NextReview?: string
+    isReviewDue: boolean
+    daysSinceReviewed?: number
+  } | null>(null)
   const recognitionRef = useRef<any>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
   }, [messages])
+
+  useEffect(() => {
+    if (!isCurriculumMode || !knowledgePointId) return
+    async function loadReviewStatus() {
+      try {
+        const res = await fetch(`/api/knowledge-points/${knowledgePointId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        const now = new Date()
+        const daysSinceReviewed = data.lastReviewedAt
+          ? Math.round((now.getTime() - new Date(data.lastReviewedAt).getTime()) / (1000 * 60 * 60 * 24))
+          : null
+        const isReviewDue = data.sm2NextReview && new Date(data.sm2NextReview) <= now
+        setReviewStatus({
+          mastery: data.mastery || 0,
+          status: data.status || "not_started",
+          lastReviewedAt: data.lastReviewedAt,
+          sm2NextReview: data.sm2NextReview,
+          isReviewDue,
+          daysSinceReviewed,
+        })
+      } catch { /* ignore */ }
+    }
+    loadReviewStatus()
+  }, [knowledgePointId, isCurriculumMode])
 
   // Speech-to-text
   function toggleListening() {
@@ -262,6 +295,26 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
             <FileText className="h-3 w-3" />
             AI 记忆已激活
           </Badge>
+          {isCurriculumMode && reviewStatus && (
+            <>
+              <Badge variant={reviewStatus.isReviewDue ? "destructive" : reviewStatus.mastery >= 4 ? "secondary" : "outline"} className="text-[10px] gap-1 shrink-0">
+                {reviewStatus.isReviewDue ? (
+                  <>🔔 需复习</>
+                ) : reviewStatus.mastery >= 4 ? (
+                  <>✅ 已掌握 ({reviewStatus.mastery}/5)</>
+                ) : reviewStatus.mastery > 0 ? (
+                  <>📚 学习中 ({reviewStatus.mastery}/5)</>
+                ) : (
+                  <>🌱 未开始</>
+                )}
+              </Badge>
+              {reviewStatus.isReviewDue && reviewStatus.daysSinceReviewed !== undefined && (
+                <Badge variant="destructive" className="text-[10px] gap-1 shrink-0">
+                  ⏰ 过期{reviewStatus.daysSinceReviewed}天
+                </Badge>
+              )}
+            </>
+          )}
         </div>
 
         {/* Messages */}

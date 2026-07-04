@@ -1,9 +1,78 @@
 import { auth } from "@/lib/auth"
 import { buildContext } from "@/lib/ai/context-builder"
-import { chatCompletionStream } from "@/lib/ai/client"
+import { chatCompletionStream, chatCompletion } from "@/lib/ai/client"
 import { prisma } from "@/lib/db"
 import { trackActivity } from "@/lib/activity"
 import { NextResponse } from "next/server"
+
+async function updateMasteryFromConversation(
+  userId: string,
+  knowledgePointId: string,
+  userMessage: string,
+  assistantResponse: string
+) {
+  const kp = await prisma.knowledgePoint.findUnique({
+    where: { id: knowledgePointId },
+    include: { module: { include: { course: { select: { userId: true } } } } },
+  })
+  if (!kp || kp.module.course.userId !== userId) return
+
+  if (kp.mastery >= 5) return
+
+  const prompt = `Evaluate the quality of this learning conversation and suggest a mastery adjustment (0-5 scale).
+
+Knowledge point: ${kp.title}
+User message: ${userMessage.slice(0, 500)}
+Assistant response: ${assistantResponse.slice(0, 500)}
+
+Evaluation criteria:
+- 5: User demonstrates deep understanding, asks insightful questions, connects concepts
+- 4: User shows good comprehension, asks relevant questions
+- 3: User participates actively, shows basic understanding
+- 2: User asks simple questions, limited engagement
+- 1: User barely engages or asks off-topic questions
+
+Respond ONLY with a JSON object: {"suggestedMastery": 3}
+
+Do NOT include any explanation, just the JSON.`
+
+  try {
+    const result = await chatCompletion({
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      maxTokens: 50,
+    })
+
+    const text = result.choices?.[0]?.message?.content ?? ""
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return
+
+    const parsed = JSON.parse(jsonMatch[0])
+    const suggestedMastery = typeof parsed.suggestedMastery === "number"
+      ? Math.max(0, Math.min(5, parsed.suggestedMastery))
+      : null
+
+    if (suggestedMastery === null) return
+
+    const newMastery = Math.max(
+      kp.mastery,
+      Math.round((kp.mastery * 0.8 + suggestedMastery * 0.4))
+    )
+
+    if (newMastery > kp.mastery) {
+      await prisma.knowledgePoint.update({
+        where: { id: knowledgePointId },
+        data: {
+          mastery: newMastery,
+          status: newMastery >= 4 ? "mastered" : newMastery > 0 ? "in_progress" : "not_started",
+          completedAt: newMastery >= 4 && !kp.completedAt ? new Date() : undefined,
+        },
+      })
+    }
+  } catch {
+    // Silent fail — mastery update is best-effort
+  }
+}
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -160,6 +229,11 @@ export async function POST(req: Request) {
             totalTokens: { increment: Math.ceil(fullResponse.length / 3) + Math.ceil(message.length / 3) },
           },
         })
+
+        // Async: Update knowledge point mastery based on conversation quality
+        if (knowledgePointId && message.length >= 10) {
+          updateMasteryFromConversation(session.user.id, knowledgePointId, message, fullResponse).catch(() => {})
+        }
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conv!.id })}\n\n`))
         controller.close()

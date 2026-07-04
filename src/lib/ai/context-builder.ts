@@ -153,6 +153,32 @@ async function buildCurriculumContext(
 
   if (!course || !kp) return makeContext(STATIC_IDENTITY, conversationHistory)
 
+  const now = new Date()
+  const daysSinceReviewed = kp.lastReviewedAt
+    ? Math.round((now.getTime() - new Date(kp.lastReviewedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null
+  const isReviewDue = kp.sm2NextReview && new Date(kp.sm2NextReview) <= now
+  const reviewDueDays = kp.sm2NextReview
+    ? Math.round((new Date(kp.sm2NextReview).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    : null
+
+  let masteryStatus = "首次学习"
+  if (kp.mastery >= 4) {
+    if (isReviewDue) {
+      masteryStatus = `已掌握，但需复习（过期${Math.abs(reviewDueDays || 0)}天）`
+    } else if (daysSinceReviewed !== null) {
+      masteryStatus = `已掌握，上次复习${daysSinceReviewed}天前`
+    } else {
+      masteryStatus = "已掌握"
+    }
+  } else if (kp.mastery > 0) {
+    if (isReviewDue) {
+      masteryStatus = `学习中，需复习（过期${Math.abs(reviewDueDays || 0)}天）`
+    } else {
+      masteryStatus = `学习中（掌握度${kp.mastery}/5）`
+    }
+  }
+
   // === CACHE-FRIENDLY PREFIX (static identity + profile + anchors) ===
   const parts: string[] = [STATIC_IDENTITY]
 
@@ -168,6 +194,7 @@ async function buildCurriculumContext(
   const done = modules.filter((m) => !m.parentModuleId && m.status === "completed").length
   const versionTag = course.version ? ` [v${course.version}]` : ""
   parts.push(`\n## Course: ${course.title}${versionTag} (${done}/${total} done) | Module: ${kp.module.title}`)
+  parts.push(`\n## Learning State: ${masteryStatus} | Mastery: ${kp.mastery}/5 | Status: ${kp.status}`)
   if (course.version) {
     parts.push(`**VERSION LOCK**: 本课程严格限定为 ${course.title} ${course.version} 版本。你回答的所有内容、API、概念、配置都必须基于 ${course.version} 版本。绝对禁止提及或混入其他版本的特性、变更或废弃内容。如果用户问到其他版本的内容，礼貌地告知用户本课程只覆盖 ${course.version} 版本。`)
   }
