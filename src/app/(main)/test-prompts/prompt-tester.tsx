@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Play } from "lucide-react"
-import { renderMarkdown } from "@/lib/markdown"
+import { MarkdownContent } from "@/components/courses/markdown-content"
 
 interface KPItem { id: string; title: string }
 interface ModuleItem { id: string; title: string; knowledgePoints: KPItem[]; childModules: ModuleItem[] }
@@ -113,7 +113,7 @@ export function PromptTester({ courses }: { courses: CourseItem[] }) {
               <CardTitle className="text-sm flex items-center gap-2">V2 输出 <Badge variant="secondary">{difficulty}</Badge></CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(result.content) }} />
+              <MarkdownContent content={result.content} />
             </CardContent>
           </Card>
         </div>

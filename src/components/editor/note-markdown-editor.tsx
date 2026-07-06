@@ -3,7 +3,7 @@
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { renderMarkdown } from "@/lib/markdown"
+import { MarkdownContent } from "@/components/courses/markdown-content"
 
 interface Props {
   content: string
@@ -27,8 +27,8 @@ export function NoteMarkdownEditor({ content, onChange }: Props) {
       </TabsContent>
       <TabsContent value="preview">
         <Card className="min-h-[500px]">
-          <CardContent className="prose prose-sm dark:prose-invert max-w-none p-6">
-            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
+          <CardContent className="p-6">
+            <MarkdownContent content={content} />
           </CardContent>
         </Card>
       </TabsContent>

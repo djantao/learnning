@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { History, RotateCcw, Eye, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDate } from "@/lib/format-date"
-import { renderMarkdown } from "@/lib/markdown"
+import { MarkdownContent } from "@/components/courses/markdown-content"
 
 interface VersionPreview {
   id: string
@@ -159,15 +159,14 @@ export function NoteVersionHistory({ noteId, onRestored }: Props) {
               </div>
             ) : previewVersion ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>{formatDate(previewVersion.createdAt)}</span>
-                  <span>{previewVersion.wordCount} 字</span>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>{formatDate(previewVersion.createdAt)}</span>
+                    <span>{previewVersion.wordCount} 字</span>
+                  </div>
+                  <div className="border rounded-lg p-4">
+                    <MarkdownContent content={previewVersion.content} />
+                  </div>
                 </div>
-                <div
-                  className="prose prose-sm dark:prose-invert max-w-none border rounded-lg p-4"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(previewVersion.content) }}
-                />
-              </div>
             ) : (
               <p className="text-sm text-muted-foreground py-8 text-center">版本内容为空</p>
             )}
