@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Send, Plus, MessageSquare, Sparkles, Brain, FileText, Volume2, Mic, MicOff } from "lucide-react"
-import { renderMarkdown } from "@/lib/markdown"
+import { MarkdownContent } from "@/components/courses/markdown-content"
 import { toast } from "sonner"
 
 interface Conversation {
@@ -283,7 +283,7 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
                   {msg.role === "user" ? (
                     <div className="whitespace-pre-wrap" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{msg.content}</div>
                   ) : (
-                    msg.content ? <div className="prose prose-sm dark:prose-invert max-w-none" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }} dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} /> : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
+                    msg.content ? <MarkdownContent content={msg.content} /> : (streaming && i === messages.length - 1 ? <span className="text-muted-foreground">思考中...</span> : null)
                   )}
                   {msg.role === "assistant" && msg.content && !msg.content.startsWith("你好！我是") && (
                     <button
