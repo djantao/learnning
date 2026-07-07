@@ -4,18 +4,23 @@ import { useEffect, useRef, useState } from "react"
 
 export function MermaidBlock({ code }: { code: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [svg, setSvg] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
-  const idRef = useRef(`mermaid-${Math.random().toString(36).slice(2, 10)}`)
+  const renderCountRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
     async function render() {
       try {
+        renderCountRef.current++
+        const id = `mermaid-${Date.now()}-${renderCountRef.current}`
         const mermaid = (await import("mermaid")).default
         mermaid.initialize({ startOnLoad: false, theme: "default" })
-        const { svg } = await mermaid.render(idRef.current, code)
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = svg
+        const result = await mermaid.render(id, code)
+        if (!cancelled) {
+          // mermaid v11 返回 { svg, bindFunctions }
+          const svgStr = typeof result === "string" ? result : result.svg
+          setSvg(svgStr)
         }
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "图表渲染失败")
@@ -34,10 +39,18 @@ export function MermaidBlock({ code }: { code: string }) {
     )
   }
 
+  if (!svg) {
+    return (
+      <div className="my-4 flex justify-center items-center rounded-lg bg-white dark:bg-slate-900 p-4 border">
+        <span className="text-xs text-muted-foreground">正在渲染图表...</span>
+      </div>
+    )
+  }
+
   return (
     <div
-      ref={containerRef}
       className="my-4 flex justify-center overflow-x-auto rounded-lg bg-white dark:bg-slate-900 p-4 border"
+      dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
 }

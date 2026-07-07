@@ -1,95 +1,107 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { createRoot } from "react-dom/client"
-import { renderMarkdown } from "@/lib/markdown"
+import { useMemo } from "react"
 import { MermaidBlock } from "@/components/mermaid-block"
 
-interface Placeholder {
-  key: string
-  html: string
+interface Block {
+  type: "text" | "mermaid" | "code"
+  content: string
+  lang?: string
 }
 
 /**
- * 用占位符替换 Mermaid 和代码块，避免 renderMarkdown 二次转义
+ * 将 markdown 内容拆分为文本块、mermaid 块和代码块
  */
-function protectBlocks(md: string): { text: string; blocks: Placeholder[] } {
-  const blocks: Placeholder[] = []
-  let idx = 0
+function parseBlocks(md: string): Block[] {
+  const blocks: Block[] = []
+  const regex = /```(mermaid|\w*)\s*[\r\n]+([\s\S]*?)```/g
+  let lastIndex = 0
+  let match
 
-  let text = md.replace(
-    /```mermaid\s*[\r\n]+([\s\S]*?)```/g,
-    (_, code: string) => {
-      const key = `__MERMAID_${idx++}__`
-      blocks.push({
-        key,
-        html: `<div class="mermaid-placeholder" data-mermaid-code="${encodeURIComponent(code.trim())}"></div>`,
-      })
-      return key
-    },
-  )
-
-  // 其他代码块 → <pre>
-  text = text.replace(
-    /```(\w*)\s*[\r\n]+([\s\S]*?)```/g,
-    (_, lang: string, code: string) => {
-      const key = `__CODE_${idx++}__`
-      const escaped = code
-        .trim()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-      blocks.push({
-        key,
-        html: `<pre class="bg-muted/50 rounded-lg p-3 my-3 overflow-x-auto text-xs"><code>${escaped}</code></pre>`,
-      })
-      return key
-    },
-  )
-
-  return { text, blocks }
-}
-
-function restoreBlocks(html: string, blocks: Placeholder[]): string {
-  let result = html
-  for (const { key, html: blockHtml } of blocks) {
-    result = result.replace(key, blockHtml)
+  while ((match = regex.exec(md)) !== null) {
+    // match 之前的文本
+    if (match.index > lastIndex) {
+      blocks.push({ type: "text", content: md.slice(lastIndex, match.index) })
+    }
+    const lang = match[1] || ""
+    const code = match[2].trim()
+    if (lang === "mermaid") {
+      blocks.push({ type: "mermaid", content: code })
+    } else {
+      blocks.push({ type: "code", content: code, lang })
+    }
+    lastIndex = regex.lastIndex
   }
-  return result
+
+  // 剩余文本
+  if (lastIndex < md.length) {
+    blocks.push({ type: "text", content: md.slice(lastIndex) })
+  }
+
+  return blocks
 }
 
-export function MarkdownContent({ content }: { content: string }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const rootsRef = useRef<ReturnType<typeof createRoot>[]>([])
+function TextBlock({ text }: { text: string }) {
+  const html = useMemo(() => renderInlineMarkdown(text), [text])
 
-  useEffect(() => {
-    if (!containerRef.current) return
-
-    for (const root of rootsRef.current) {
-      root.unmount()
-    }
-    rootsRef.current = []
-
-    const placeholders = containerRef.current.querySelectorAll<HTMLDivElement>(".mermaid-placeholder")
-    for (const el of placeholders) {
-      const code = decodeURIComponent(el.getAttribute("data-mermaid-code") || "")
-      if (!code) continue
-      const root = createRoot(el)
-      rootsRef.current.push(root)
-      root.render(<MermaidBlock code={code} />)
-    }
-  }, [content])
-
-  // 1. 保护代码块 → 2. markdown 转 HTML → 3. 恢复代码块
-  const { text, blocks } = protectBlocks(content)
-  const html = renderMarkdown(text)
-  const finalHtml = restoreBlocks(html, blocks)
+  if (!text.trim()) return null
 
   return (
     <div
-      ref={containerRef}
-      className="text-sm leading-relaxed prose prose-slate dark:prose-invert max-w-none"
-      dangerouslySetInnerHTML={{ __html: finalHtml }}
+      className="my-2 break-words"
+      dangerouslySetInnerHTML={{ __html: html }}
     />
+  )
+}
+
+function renderInlineMarkdown(md: string): string {
+  let html = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+
+  html = html
+    .replace(/^#### (.+)$/gm, "<h4 class='text-base font-semibold mt-4 mb-2'>$1</h4>")
+    .replace(/^### (.+)$/gm, "<h3 class='text-lg font-semibold mt-4 mb-2'>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2 class='text-xl font-bold mt-6 mb-3'>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1 class='text-2xl font-bold mt-6 mb-3'>$1</h1>")
+    .replace(/^---$/gm, "<hr class='my-4 border-border'/>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, "<code class='bg-muted px-1 rounded text-xs break-all'>$1</code>")
+    .replace(/\n- (.+)/g, "\n<li class='ml-3 sm:ml-4 list-disc break-words'>$1</li>")
+    .replace(/\n\n/g, "</p><p class='my-2'>")
+    .replace(/\n/g, "<br/>")
+
+  return `<p class='my-2 break-words'>${html}</p>`
+}
+
+function CodeBlock({ code, lang }: { code: string; lang?: string }) {
+  return (
+    <div className="my-2 rounded-md bg-muted/80 p-2 sm:p-3 overflow-x-auto -mx-2 sm:mx-0">
+      {lang && <div className="text-[10px] text-muted-foreground mb-1">{lang}</div>}
+      <pre className="text-xs font-mono whitespace-pre">
+        <code>{code}</code>
+      </pre>
+    </div>
+  )
+}
+
+export function MarkdownContent({ content }: { content: string }) {
+  const blocks = useMemo(() => parseBlocks(content), [content])
+
+  return (
+    <div className="text-sm leading-relaxed prose prose-slate dark:prose-invert max-w-none">
+      {blocks.map((block, i) => {
+        switch (block.type) {
+          case "mermaid":
+            return <MermaidBlock key={i} code={block.content} />
+          case "code":
+            return <CodeBlock key={i} code={block.content} lang={block.lang} />
+          case "text":
+            return <TextBlock key={i} text={block.content} />
+        }
+      })}
+    </div>
   )
 }
