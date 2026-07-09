@@ -328,3 +328,24 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ── Markdown code block overrides for highlight.js ── */
+.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* ── Scrollbar for code blocks ── */
+.prose-reset pre::-webkit-scrollbar {
+  height: 6px;
+}
+.prose-reset pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+.prose-reset pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+.prose-reset pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
