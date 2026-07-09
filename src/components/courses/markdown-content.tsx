@@ -1,107 +1,217 @@
 "use client"
 
-import { useMemo } from "react"
+import { useState, useRef, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import rehypeHighlight from "rehype-highlight"
+import "highlight.js/styles/github-dark.css"
 import { MermaidBlock } from "@/components/mermaid-block"
+import { Check, Copy } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
-interface Block {
-  type: "text" | "mermaid" | "code"
-  content: string
-  lang?: string
-}
+function CopyButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
 
-/**
- * 将 markdown 内容拆分为文本块、mermaid 块和代码块
- */
-function parseBlocks(md: string): Block[] {
-  const blocks: Block[] = []
-  const regex = /```(mermaid|\w*)\s*[\r\n]+([\s\S]*?)```/g
-  let lastIndex = 0
-  let match
-
-  while ((match = regex.exec(md)) !== null) {
-    // match 之前的文本
-    if (match.index > lastIndex) {
-      blocks.push({ type: "text", content: md.slice(lastIndex, match.index) })
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* ignore */
     }
-    const lang = match[1] || ""
-    const code = match[2].trim()
-    if (lang === "mermaid") {
-      blocks.push({ type: "mermaid", content: code })
-    } else {
-      blocks.push({ type: "code", content: code, lang })
-    }
-    lastIndex = regex.lastIndex
   }
-
-  // 剩余文本
-  if (lastIndex < md.length) {
-    blocks.push({ type: "text", content: md.slice(lastIndex) })
-  }
-
-  return blocks
-}
-
-function TextBlock({ text }: { text: string }) {
-  const html = useMemo(() => renderInlineMarkdown(text), [text])
-
-  if (!text.trim()) return null
 
   return (
-    <div
-      className="my-2 break-words"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7 text-gray-400 hover:text-white transition-colors"
+      onClick={handleCopy}
+      title={copied ? "已复制" : "复制代码"}
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+    </Button>
   )
 }
 
-function renderInlineMarkdown(md: string): string {
-  let html = md
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+function CodeBlockWrapper({ lang, children }: { lang?: string; children: React.ReactNode }) {
+  const codeRef = useRef<HTMLPreElement>(null)
+  const [codeText, setCodeText] = useState("")
 
-  html = html
-    .replace(/^#### (.+)$/gm, "<h4 class='text-base font-semibold mt-4 mb-2'>$1</h4>")
-    .replace(/^### (.+)$/gm, "<h3 class='text-lg font-semibold mt-4 mb-2'>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2 class='text-xl font-bold mt-6 mb-3'>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1 class='text-2xl font-bold mt-6 mb-3'>$1</h1>")
-    .replace(/^---$/gm, "<hr class='my-4 border-border'/>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`([^`]+)`/g, "<code class='bg-muted px-1 rounded text-xs break-all'>$1</code>")
-    .replace(/\n- (.+)/g, "\n<li class='ml-3 sm:ml-4 list-disc break-words'>$1</li>")
-    .replace(/\n\n/g, "</p><p class='my-2'>")
-    .replace(/\n/g, "<br/>")
+  useEffect(() => {
+    if (codeRef.current) {
+      setCodeText(codeRef.current.textContent || "")
+    }
+  }, [children])
 
-  return `<p class='my-2 break-words'>${html}</p>`
-}
+  if (lang === "mermaid") {
+    return <MermaidBlock code={codeText} />
+  }
 
-function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   return (
-    <div className="my-2 rounded-md bg-muted/80 p-2 sm:p-3 overflow-x-auto -mx-2 sm:mx-0">
-      {lang && <div className="text-[10px] text-muted-foreground mb-1">{lang}</div>}
-      <pre className="text-xs font-mono whitespace-pre">
-        <code>{code}</code>
-      </pre>
+    <div className="my-3 overflow-hidden rounded-xl border border-border/60 bg-[#0d1117] shadow-sm">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#161b22]">
+        <div className="flex items-center gap-2">
+          <span className="flex gap-1.5">
+            <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
+            <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
+            <span className="h-3 w-3 rounded-full bg-[#28c840]" />
+          </span>
+          {lang && (
+            <span className="ml-2 text-xs font-medium text-gray-400">{lang}</span>
+          )}
+        </div>
+        <CopyButton code={codeText} />
+      </div>
+      <div className="overflow-x-auto">
+        <pre ref={codeRef} className="!m-0 !bg-transparent !p-0">
+          {children}
+        </pre>
+      </div>
     </div>
   )
 }
 
 export function MarkdownContent({ content }: { content: string }) {
-  const blocks = useMemo(() => parseBlocks(content), [content])
-
   return (
-    <div className="text-sm leading-relaxed prose prose-slate dark:prose-invert max-w-none">
-      {blocks.map((block, i) => {
-        switch (block.type) {
-          case "mermaid":
-            return <MermaidBlock key={i} code={block.content} />
-          case "code":
-            return <CodeBlock key={i} code={block.content} lang={block.lang} />
-          case "text":
-            return <TextBlock key={i} text={block.content} />
-        }
-      })}
+    <div className="text-sm leading-relaxed max-w-none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={{
+          h1: ({ children }) => (
+            <h1 className="text-2xl font-bold mt-6 mb-3 text-foreground">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-xl font-bold mt-6 mb-3 text-foreground">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-lg font-semibold mt-4 mb-2 text-foreground">{children}</h3>
+          ),
+          h4: ({ children }) => (
+            <h4 className="text-base font-semibold mt-4 mb-2 text-foreground">{children}</h4>
+          ),
+          p: ({ children }) => (
+            <p className="my-2 leading-relaxed text-foreground/90">{children}</p>
+          ),
+          ul: ({ children }) => (
+            <ul className="my-2 ml-4 list-disc space-y-1">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="my-2 ml-4 list-decimal space-y-1">{children}</ol>
+          ),
+          li: ({ children }) => (
+            <li className="leading-relaxed">{children}</li>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="my-3 border-l-4 border-primary/40 pl-4 italic text-muted-foreground bg-muted/30 py-2 pr-3 rounded-r-lg">
+              {children}
+            </blockquote>
+          ),
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline font-medium"
+            >
+              {children}
+            </a>
+          ),
+          code: ({ className, children, ...props }) => {
+            const match = /language-(\w+)/.exec(className || "")
+            if (match) {
+              return (
+                <code
+                  className={`${className} !bg-transparent !p-4 !text-[13px] !leading-relaxed`}
+                  {...props}
+                >
+                  {children}
+                </code>
+              )
+            }
+            return (
+              <code
+                className="rounded bg-muted px-1.5 py-0.5 text-[13px] font-mono text-primary/90 border border-border/50"
+                {...props}
+              >
+                {children}
+              </code>
+            )
+          },
+          pre: ({ className, children, ...props }) => {
+            const codeEl = Array.isArray(children) ? children[0] : children
+            let lang = ""
+            if (codeEl && typeof codeEl === "object" && "props" in codeEl) {
+              const codeClassName = (codeEl as any).props?.className || ""
+              const match = /language-(\w+)/.exec(codeClassName)
+              if (match) lang = match[1]
+            }
+
+            if (lang) {
+              return (
+                <CodeBlockWrapper lang={lang}>
+                  {children}
+                </CodeBlockWrapper>
+              )
+            }
+
+            return (
+              <pre className={`${className || ""}`} {...props}>
+                {children}
+              </pre>
+            )
+          },
+          table: ({ children }) => (
+            <div className="my-3 overflow-x-auto rounded-lg border border-border/60">
+              <table className="w-full border-collapse text-sm">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-muted/50">{children}</thead>
+          ),
+          th: ({ children }) => (
+            <th className="border-b border-border px-3 py-2 text-left font-semibold">{children}</th>
+          ),
+          td: ({ children }) => (
+            <td className="border-b border-border/50 px-3 py-2">{children}</td>
+          ),
+          hr: () => <hr className="my-4 border-border" />,
+          img: ({ src, alt }) => (
+            <img
+              src={src}
+              alt={alt}
+              className="my-3 max-w-full rounded-lg shadow-sm"
+              loading="lazy"
+            />
+          ),
+          input: ({ type, checked }) => {
+            if (type === "checkbox") {
+              return (
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  readOnly
+                  className="mr-2 h-4 w-4 rounded border-border accent-primary"
+                />
+              )
+            }
+            return null
+          },
+          strong: ({ children }) => (
+            <strong className="font-semibold text-foreground">{children}</strong>
+          ),
+          em: ({ children }) => (
+            <em className="italic">{children}</em>
+          ),
+          del: ({ children }) => (
+            <del className="text-muted-foreground">{children}</del>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   )
 }
