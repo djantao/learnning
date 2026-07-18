@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Send, Plus, MessageSquare, Sparkles, Brain, FileText, Volume2, Mic, MicOff } from "lucide-react"
 import { MarkdownContent } from "@/components/courses/markdown-content"
+import { speakText } from "@/lib/tts-client"
 import { toast } from "sonner"
 
 interface Conversation {
@@ -45,40 +46,64 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
   const [convId, setConvId] = useState<string | null>(null)
   const [convList, setConvList] = useState(conversations)
   const [listening, setListening] = useState(false)
-  const recognitionRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
   }, [messages])
 
-  // Speech-to-text
-  function toggleListening() {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      toast.error("当前浏览器不支持语音识别，请使用 Chrome 或 Edge")
-      return
-    }
+  // 语音输入：MediaRecorder 采集 → 云端 ASR
+  async function toggleListening() {
     if (listening) {
-      recognitionRef.current?.stop()
+      mediaRecorderRef.current?.stop()
       setListening(false)
       return
     }
-    const recognition = new SpeechRecognition()
-    recognition.lang = "zh-CN"
-    recognition.interimResults = true
-    recognition.continuous = true
-    recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map((r: any) => r[0].transcript)
-        .join("")
-      setInput(transcript)
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm"
+      const recorder = new MediaRecorder(stream, { mimeType })
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = async () => {
+        // 停止所有音轨
+        stream.getTracks().forEach((t) => t.stop())
+        setListening(false)
+
+        if (audioChunksRef.current.length === 0) return
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
+        const formData = new FormData()
+        formData.append("audio", audioBlob, "recording.webm")
+
+        try {
+          const res = await fetch("/api/ai/asr", { method: "POST", body: formData })
+          const data = await res.json()
+          if (data.text) {
+            setInput((prev) => prev + data.text)
+          } else if (data.error) {
+            toast.error(data.error)
+          }
+        } catch {
+          toast.error("语音识别请求失败，请检查网络")
+        }
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setListening(true)
+    } catch {
+      toast.error("无法访问麦克风，请检查浏览器权限")
     }
-    recognition.onerror = () => { setListening(false) }
-    recognition.onend = () => { setListening(false) }
-    recognitionRef.current = recognition
-    recognition.start()
-    setListening(true)
   }
 
   // Reset conversation when switching knowledge points in curriculum mode
@@ -198,17 +223,13 @@ export function ChatPanel({ conversations, courseId, knowledgePointId, kpTitle, 
   }
 
   function speak(text: string, index: number) {
-    const synth = window.speechSynthesis
-    if (synth.speaking) {
-      synth.cancel()
-      if (speakingIndex === index) { setSpeakingIndex(null); return }
+    // 如果正在朗读同一段，停止
+    if (speakingIndex === index) {
+      setSpeakingIndex(null)
+      return
     }
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = "zh-CN"
-    u.rate = 1.1
-    u.onend = () => setSpeakingIndex(null)
     setSpeakingIndex(index)
-    synth.speak(u)
+    speakText(text, "xiaoming", undefined, () => setSpeakingIndex(null))
   }
 
   return (

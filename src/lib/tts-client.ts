@@ -77,6 +77,50 @@ export async function textToAudioBuffer(
 }
 
 /**
+ * 朗读文本（浏览器端播放，使用微软 Edge 神经网络语音）
+ * 比 speechSynthesis 自然得多
+ */
+export async function speakText(
+  text: string,
+  speaker: "xiaoming" | "xiaohong" = "xiaoming",
+  onStart?: () => void,
+  onEnd?: () => void
+): Promise<void> {
+  try {
+    const audioBuf = await textToAudioBuffer(text, speaker)
+    const audioCtx = new AudioContext()
+    const source = audioCtx.createBufferSource()
+    const audioBuffer = await audioCtx.decodeAudioData(audioBuf.slice(0))
+    source.buffer = audioBuffer
+    source.connect(audioCtx.destination)
+    source.onended = () => {
+      audioCtx.close()
+      onEnd?.()
+    }
+    source.start()
+    onStart?.()
+  } catch (err) {
+    console.warn("Edge TTS 播放失败，回退到浏览器 TTS:", err)
+    // 回退到浏览器内置 TTS
+    fallbackSpeak(text, onStart, onEnd)
+  }
+}
+
+function fallbackSpeak(text: string, onStart?: () => void, onEnd?: () => void): void {
+  const synth = window.speechSynthesis
+  if (!synth) {
+    onEnd?.()
+    return
+  }
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = "zh-CN"
+  u.rate = 1.1
+  u.onstart = () => onStart?.()
+  u.onend = () => onEnd?.()
+  synth.speak(u)
+}
+
+/**
  * 将播客所有片段合成一个完整 Blob URL
  */
 export async function synthesizePodcastClient(
